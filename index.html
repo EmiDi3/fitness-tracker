@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>My Fitness Journey</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Fitness" />
+<meta name="theme-color" content="#F4EEE1" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23C4677A'/%3E%3Ctext x='12' y='17' font-size='14' text-anchor='middle' fill='white' font-family='sans-serif'%3EF%3C/text%3E%3C/svg%3E" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+<script src="https://unpkg.com/chart.js@4/dist/chart.umd.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Inter:wght@400;500;600&display=swap');
+  html, body { background: #F4EEE1; margin: 0; }
+  body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number] { -moz-appearance: textfield; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useRef } = React;
+
+/* ------------------------------------------------------------------ */
+/* Persistence                                                         */
+/* ------------------------------------------------------------------ */
+
+const HISTORY_KEY = "fitness-tracker:history:v1";
+const ACTIVE_KEY = "fitness-tracker:active:v1";
+
+function loadJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return fallback;
+}
+function saveJSON(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {}
+}
+
+/* ------------------------------------------------------------------ */
+/* Design tokens                                                       */
+/* ------------------------------------------------------------------ */
+
+const C = {
+  bg: "#F4EEE1",
+  card: "#FFFDF8",
+  cardAlt: "#FBF3E7",
+  rose: "#C4677A",
+  roseDark: "#A34F60",
+  roseLight: "#F0D6DC",
+  roseLighter: "#F8E9EC",
+  sage: "#7C9473",
+  sageDark: "#5F7457",
+  sageLight: "#E0E8DA",
+  gold: "#D9A441",
+  goldLight: "#F6E7C8",
+  plum: "#2E2432",
+  taupe: "#8A7B72",
+  taupeLight: "#C9BEB3",
+  line: "#E7DCC9",
+};
+
+const MUSCLE_PALETTE = ["#C4677A", "#7C9473", "#D9A441", "#9B6A8C", "#6E8CA0", "#B98058", "#8D8360", "#B4849C"];
+
+function muscleColor(muscle) {
+  const order = ["Chest", "Shoulders", "Triceps", "Quads", "Glutes", "Calves", "Core", "Hamstrings", "Back", "Rear Delts", "Biceps", "Posterior Chain"];
+  const idx = order.indexOf(muscle);
+  return MUSCLE_PALETTE[(idx >= 0 ? idx : muscle.length) % MUSCLE_PALETTE.length];
+}
+
+/* ------------------------------------------------------------------ */
+/* Inline icons (no external icon dependency)                          */
+/* ------------------------------------------------------------------ */
+
+function Icon({ children, size = 18, style }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+      {children}
+    </svg>
+  );
+}
+const IconHome = (p) => <Icon {...p}><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /></Icon>;
+const IconDumbbell = (p) => <Icon {...p}><path d="M4 9v6M2 10v4M20 10v4M22 9v6M7 9v6M17 9v6" /><path d="M7 12h10" /></Icon>;
+const IconList = (p) => <Icon {...p}><path d="M4 6h16M4 12h16M4 18h10" /></Icon>;
+const IconTrendUp = (p) => <Icon {...p}><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></Icon>;
+const IconFlame = (p) => <Icon {...p}><path d="M12 3c1 3-3 4-3 8a3 3 0 0 0 6 0c0-1-1-2-1-2s2 1 2 4a5 5 0 0 1-10 0c0-5 4-6 4-10z" /></Icon>;
+const IconTrophy = (p) => <Icon {...p}><path d="M8 4h8v5a4 4 0 0 1-8 0V4z" /><path d="M8 5H5a3 3 0 0 0 3 4M16 5h3a3 3 0 0 1-3 4" /><path d="M12 13v3M9 20h6M10 20v-2h4v2" /></Icon>;
+const IconPlus = (p) => <Icon {...p}><path d="M12 5v14M5 12h14" /></Icon>;
+const IconCheck = (p) => <Icon {...p}><path d="M20 6L9 17l-5-5" /></Icon>;
+const IconX = (p) => <Icon {...p}><path d="M18 6L6 18M6 6l12 12" /></Icon>;
+const IconTimer = (p) => <Icon {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></Icon>;
+const IconChevronRight = (p) => <Icon {...p}><path d="M9 6l6 6-6 6" /></Icon>;
+const IconChevronDown = (p) => <Icon {...p}><path d="M6 9l6 6 6-6" /></Icon>;
+const IconDownload = (p) => <Icon {...p}><path d="M12 3v12M7 11l5 5 5-5" /><path d="M4 19h16" /></Icon>;
+const IconUpload = (p) => <Icon {...p}><path d="M12 21V9M7 13l5-5 5 5" /><path d="M4 19h16" /></Icon>;
+
+/* ------------------------------------------------------------------ */
+/* Workout plan                                                        */
+/* ------------------------------------------------------------------ */
+
+const WORKOUT_PLAN = [
+  { id: "day1", shortName: "Day 1: Lower Body (Quads & Glutes)", name: "Quads & Glutes", focus: "Quads, Glutes, Calves",
+    warmup: ["5 min easy bike", "Leg swings x10 each way", "Bodyweight squats x15", "Hip circles x10 each way"],
+    cooldown: ["Quad stretch, 30s/side", "Hip flexor stretch, 30s/side", "Calf stretch, 30s/side"],
+    exercises: [
+      { name: "Back Squat", muscle: "Quads", targetSets: 4, targetReps: "6-8" },
+      { name: "Hip Thrust", muscle: "Glutes", targetSets: 4, targetReps: "8-10" },
+      { name: "Bulgarian Split Squat", muscle: "Glutes", targetSets: 3, targetReps: "10/leg" },
+      { name: "Leg Press", muscle: "Quads", targetSets: 3, targetReps: "10-12" },
+      { name: "Leg Extension", muscle: "Quads", targetSets: 3, targetReps: "12-15" },
+      { name: "Standing Calf Raise", muscle: "Calves", targetSets: 3, targetReps: "12-15" },
+    ] },
+  { id: "day2", shortName: "Day 2: Lower Body (Posterior & Glutes)", name: "Posterior Chain & Glutes", focus: "Hamstrings, Glutes, Core",
+    warmup: ["5 min row", "Glute bridges x15", "Band lateral walks x10 each way", "Cat-cow x10"],
+    cooldown: ["Hamstring stretch, 30s/side", "Lower back stretch, 30s", "Glute stretch, 30s/side"],
+    exercises: [
+      { name: "Conventional Deadlift", muscle: "Posterior Chain", targetSets: 4, targetReps: "5" },
+      { name: "Romanian Deadlift", muscle: "Hamstrings", targetSets: 3, targetReps: "8-10" },
+      { name: "Cable Kickback", muscle: "Glutes", targetSets: 3, targetReps: "12-15/leg" },
+      { name: "Lying Leg Curl", muscle: "Hamstrings", targetSets: 3, targetReps: "12-15" },
+      { name: "Back Extension", muscle: "Glutes", targetSets: 3, targetReps: "12-15" },
+      { name: "Hanging Leg Raise", muscle: "Core", targetSets: 3, targetReps: "12-15" },
+    ] },
+  { id: "day3", shortName: "Day 3: Mixed (Glutes + Core)", name: "Mixed", focus: "Glutes, Quads, Core, Rear Delts",
+    warmup: ["5 min bike or row", "Hip circles x10 each way", "Dynamic hip flexor stretch", "Cat-cow x10"],
+    cooldown: ["Hip flexor stretch, 30s/side", "Glute stretch, 30s/side", "Lower back stretch, 30s"],
+    exercises: [
+      { name: "Goblet Squat", muscle: "Quads", targetSets: 3, targetReps: "10-12" },
+      { name: "Walking Lunges", muscle: "Glutes", targetSets: 3, targetReps: "10/leg" },
+      { name: "Cable Hip Abduction", muscle: "Glutes", targetSets: 3, targetReps: "15/leg" },
+      { name: "Face Pull", muscle: "Rear Delts", targetSets: 3, targetReps: "15" },
+      { name: "Cable Crunch", muscle: "Core", targetSets: 3, targetReps: "15" },
+      { name: "Plank", muscle: "Core", targetSets: 3, targetReps: "45s" },
+    ] },
+  { id: "day4", shortName: "Day 4: Upper Body", name: "Upper Body", focus: "Chest, Back, Shoulders, Arms",
+    warmup: ["5 min row", "Arm circles x20 each way", "Band pull-aparts x15", "Shoulder dislocates x10"],
+    cooldown: ["Chest stretch, 30s/side", "Lat stretch, 30s/side", "Triceps & biceps stretch, 30s/side"],
+    exercises: [
+      { name: "Barbell Bench Press", muscle: "Chest", targetSets: 4, targetReps: "6-8" },
+      { name: "Barbell Row", muscle: "Back", targetSets: 4, targetReps: "8-10" },
+      { name: "Seated DB Shoulder Press", muscle: "Shoulders", targetSets: 3, targetReps: "8-10" },
+      { name: "Lat Pulldown", muscle: "Back", targetSets: 3, targetReps: "10-12" },
+      { name: "Triceps Rope Pushdown", muscle: "Triceps", targetSets: 3, targetReps: "10-12" },
+      { name: "Rear Delt Fly", muscle: "Rear Delts", targetSets: 3, targetReps: "12-15" },
+      { name: "DB Bicep Curl", muscle: "Biceps", targetSets: 3, targetReps: "10-12" },
+    ] },
+];
+
+const MUSCLE_MAP = {};
+WORKOUT_PLAN.forEach((d) => d.exercises.forEach((e) => (MUSCLE_MAP[e.name] = e.muscle)));
+
+const EXTRA_EXERCISES = {
+  Chest: ["Incline DB Press", "Cable Fly", "Push-Ups", "Machine Chest Press"],
+  Shoulders: ["Arnold Press", "Front Raise", "Cable Lateral Raise", "Machine Shoulder Press"],
+  Triceps: ["Overhead DB Extension", "Close-Grip Bench Press", "Assisted Dips"],
+  Quads: ["Front Squat", "Step-Ups"],
+  Glutes: ["Glute Bridge", "Curtsy Lunge", "Single-Leg Hip Thrust"],
+  Calves: ["Seated Calf Raise"],
+  Core: ["Russian Twist", "Ab Wheel Rollout"],
+  Hamstrings: ["Good Morning"],
+  Back: ["T-Bar Row", "Single-Arm DB Row", "Straight-Arm Pulldown", "Seated Cable Row", "Assisted Pull-Ups"],
+  "Rear Delts": ["Reverse Pec Deck"],
+  Biceps: ["Cable Curl", "Preacher Curl", "Hammer Curl"],
+  "Posterior Chain": ["Sumo Deadlift", "Kettlebell Swing"],
+};
+Object.entries(EXTRA_EXERCISES).forEach(([muscle, list]) => list.forEach((name) => (MUSCLE_MAP[name] = muscle)));
+
+/* ------------------------------------------------------------------ */
+/* Helpers                                                              */
+/* ------------------------------------------------------------------ */
+
+function formatDate(iso) {
+  return new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+function formatShortDate(iso) {
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+function startOfWeek(date) {
+  const d = new Date(date);
+  const day = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - day);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+function totalSets(session) {
+  return session.exercises.reduce((sum, e) => sum + e.sets.length, 0);
+}
+function bestSet(exSets) {
+  return exSets.reduce((best, s) => (s.completed && s.weight > (best?.weight ?? -1) ? s : best), null);
+}
+function computePRs(history) {
+  const prs = {};
+  const sorted = [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
+  sorted.forEach((session) => {
+    session.exercises.forEach((ex) => {
+      const b = bestSet(ex.sets);
+      if (!b) return;
+      if (!prs[ex.name] || b.weight > prs[ex.name].weight) {
+        prs[ex.name] = { weight: b.weight, reps: b.reps, date: session.date, muscle: ex.muscle };
+      }
+    });
+  });
+  return prs;
+}
+function computeStreak(history) {
+  const real = history.filter((s) => !s.isSeed);
+  if (real.length === 0) return 0;
+  const sorted = [...real].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const daysSinceLast = (new Date() - new Date(sorted[0].date)) / 86400000;
+  if (daysSinceLast > 3) return 0;
+  let streak = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    const gap = (new Date(sorted[i - 1].date) - new Date(sorted[i].date)) / 86400000;
+    if (gap <= 3) streak++;
+    else break;
+  }
+  return streak;
+}
+function computeThisWeekCount(history) {
+  const weekStart = startOfWeek(new Date());
+  return history.filter((s) => new Date(s.date) >= weekStart).length;
+}
+function getPreviousForExercise(history, exerciseName) {
+  const past = history
+    .filter((s) => s.exercises.some((e) => e.name === exerciseName))
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  if (past.length === 0) return null;
+  return past[0].exercises.find((e) => e.name === exerciseName).sets;
+}
+function uid() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+/* ------------------------------------------------------------------ */
+/* Export / import                                                     */
+/* ------------------------------------------------------------------ */
+
+function downloadBlob(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function todayStamp() {
+  return new Date().toISOString().slice(0, 10);
+}
+function exportHistoryJSON(history) {
+  const payload = { exportedAt: new Date().toISOString(), app: "My Fitness Journey", history };
+  downloadBlob(JSON.stringify(payload, null, 2), `fitness-data-${todayStamp()}.json`, "application/json");
+}
+function csvEscape(value) {
+  const str = String(value ?? "");
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+function exportHistoryCSV(history) {
+  const rows = [["Date", "Workout", "Exercise", "Muscle", "Set", "Weight (kg)", "Reps"]];
+  [...history]
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .forEach((session) => {
+      session.exercises.forEach((ex) => {
+        ex.sets.forEach((s, i) => {
+          rows.push([new Date(session.date).toISOString().slice(0, 10), session.name, ex.name, ex.muscle, i + 1, s.weight, s.reps]);
+        });
+      });
+    });
+  const csv = rows.map((r) => r.map(csvEscape).join(",")).join("\n");
+  downloadBlob(csv, `fitness-data-${todayStamp()}.csv`, "text/csv");
+}
+function parseImportedHistory(raw) {
+  const parsed = JSON.parse(raw);
+  const list = Array.isArray(parsed) ? parsed : parsed.history;
+  if (!Array.isArray(list)) throw new Error("File doesn't contain a workout history array.");
+  list.forEach((s) => {
+    if (!s.date || !Array.isArray(s.exercises)) throw new Error("File isn't in the expected format.");
+  });
+  return list;
+}
+
+/* ------------------------------------------------------------------ */
+/* Weekly summary — a compact, coach-ready recap you can paste to      */
+/* Claude in a chat and ask for advice, since the app has no live      */
+/* connection to any conversation.                                     */
+/* ------------------------------------------------------------------ */
+
+function buildWeeklySummary(history) {
+  const weekStart = startOfWeek(new Date());
+  const priorPRs = computePRs(history.filter((s) => new Date(s.date) < weekStart));
+  const weekSessions = history
+    .filter((s) => new Date(s.date) >= weekStart)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  const lines = [];
+  lines.push(`Weekly training summary (${formatShortDate(weekStart.toISOString())} – ${formatShortDate(new Date().toISOString())})`);
+  lines.push(`Workouts this week: ${weekSessions.length}/4  |  Current streak: ${computeStreak(history)} days  |  Total logged: ${history.filter((s) => !s.isSeed).length}`);
+  lines.push("");
+
+  if (weekSessions.length === 0) {
+    lines.push("No workouts logged yet this week.");
+  } else {
+    const muscleTotals = {};
+    weekSessions.forEach((session) => {
+      lines.push(`${session.name} — ${formatDate(session.date)} (${session.durationMin} min)`);
+      session.exercises.forEach((ex) => {
+        const b = bestSet(ex.sets);
+        const vol = ex.sets.reduce((sum, s) => sum + (s.completed ? (Number(s.weight) || 0) * (Number(s.reps) || 0) : 0), 0);
+        muscleTotals[ex.muscle] = (muscleTotals[ex.muscle] || 0) + vol;
+        const prior = priorPRs[ex.name];
+        const isPR = b && (!prior || b.weight > prior.weight);
+        lines.push(`  - ${ex.name}: top set ${b ? `${b.weight}kg x${b.reps}` : "no completed sets"}${isPR ? " (new PR)" : ""}, ${ex.sets.length} sets, ${Math.round(vol)}kg volume`);
+      });
+      lines.push("");
+    });
+
+    const volEntries = Object.entries(muscleTotals).sort((a, b) => b[1] - a[1]);
+    if (volEntries.length) {
+      lines.push("Volume by muscle group this week (kg):");
+      volEntries.forEach(([m, v]) => lines.push(`  - ${m}: ${Math.round(v)}`));
+      lines.push("");
+    }
+  }
+
+  lines.push("Ask: \"Here's my weekly summary — what should I adjust?\"");
+  return lines.join("\n");
+}
+
+/* ------------------------------------------------------------------ */
+/* Small UI primitives                                                 */
+/* ------------------------------------------------------------------ */
+
+function StatBox({ label, value, icon, accent }) {
+  return (
+    <div className="flex-1 rounded-2xl px-3 py-4 flex flex-col items-center justify-center gap-1"
+      style={{ background: C.card, border: `1px solid ${C.line}` }}>
+      <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: accent + "22", color: accent }}>{icon}</div>
+      <div className="text-2xl font-semibold" style={{ color: C.plum, fontFamily: "Fraunces, serif" }}>{value}</div>
+      <div className="text-[11px] uppercase tracking-wide text-center" style={{ color: C.taupe }}>{label}</div>
+    </div>
+  );
+}
+function TrophyBadge({ size = 14 }) {
+  return (
+    <span className="inline-flex items-center justify-center rounded-full"
+      style={{ background: C.goldLight, color: "#8A6417", width: size + 12, height: size + 12, border: `1px dashed ${C.gold}` }}
+      title="Personal record">
+      <IconTrophy size={size} />
+    </span>
+  );
+}
+function Pill({ children, color = C.roseLighter, textColor = C.roseDark }) {
+  return (
+    <span className="px-2.5 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1" style={{ background: color, color: textColor }}>
+      {children}
+    </span>
+  );
+}
+
+function DataCard({ history, onImport, onReset }) {
+  const fileInputRef = useRef(null);
+  const [importError, setImportError] = useState("");
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const list = parseImportedHistory(reader.result);
+        if (window.confirm(`Import ${list.length} workout${list.length === 1 ? "" : "s"}? This replaces the data currently in the app.`)) {
+          onImport(list);
+          setImportError("");
+        }
+      } catch (err) {
+        setImportError("Couldn't read that file — make sure it's a JSON export from this app.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <div className="rounded-2xl p-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+      <h2 className="text-sm font-semibold mb-1" style={{ color: C.plum }}>Your data</h2>
+      <p className="text-xs mb-3" style={{ color: C.taupe }}>
+        Export a copy to move to another device, or back it up. Import brings a previous export back in.
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={() => exportHistoryJSON(history)}
+          className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-medium"
+          style={{ background: C.roseLighter, color: C.roseDark }}>
+          <IconDownload size={14} /> Export JSON
+        </button>
+        <button onClick={() => exportHistoryCSV(history)}
+          className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-medium"
+          style={{ background: C.sageLight, color: C.sageDark }}>
+          <IconDownload size={14} /> Export CSV
+        </button>
+        <button onClick={() => fileInputRef.current && fileInputRef.current.click()}
+          className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-medium"
+          style={{ border: `1.5px solid ${C.taupeLight}`, color: C.plum }}>
+          <IconUpload size={14} /> Import JSON
+        </button>
+        <button onClick={onReset}
+          className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-medium"
+          style={{ border: `1.5px solid ${C.taupeLight}`, color: C.taupe }}>
+          Clear all data
+        </button>
+      </div>
+      <input ref={fileInputRef} type="file" accept="application/json,.json" onChange={handleFileChange} style={{ display: "none" }} />
+      {importError && <p className="text-xs mt-2" style={{ color: "#A32D2D" }}>{importError}</p>}
+    </div>
+  );
+}
+
+function WeeklySummaryCard({ history }) {
+  const [copied, setCopied] = useState(false);
+  const [text, setText] = useState(null);
+
+  const handleCopy = async () => {
+    const summary = buildWeeklySummary(history);
+    try {
+      await navigator.clipboard.writeText(summary);
+      setCopied(true);
+      setText(null);
+      setTimeout(() => setCopied(false), 2500);
+    } catch (e) {
+      // Clipboard permission can fail in some contexts — fall back to showing the text to copy manually.
+      setText(summary);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl p-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+      <h2 className="text-sm font-semibold mb-1" style={{ color: C.plum }}>Weekly advice from Claude</h2>
+      <p className="text-xs mb-3" style={{ color: C.taupe }}>
+        The app can't message Claude on its own — copy this week's recap, then paste it into a chat and ask for advice.
+      </p>
+      <button onClick={handleCopy}
+        className="w-full rounded-xl py-2.5 text-sm font-medium"
+        style={{ background: copied ? C.sage : C.roseLighter, color: copied ? "#fff" : C.roseDark }}>
+        {copied ? "Copied — paste it into a chat with Claude" : "Copy this week's summary"}
+      </button>
+      {text && (
+        <textarea readOnly value={text} onFocus={(e) => e.target.select()}
+          className="w-full mt-3 rounded-xl p-2.5 text-xs"
+          style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.plum, height: 140 }} />
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Chart.js wrappers                                                   */
+/* ------------------------------------------------------------------ */
+
+function VolumeBarChart({ data }) {
+  const canvasRef = useRef(null);
+  const chartRef = useRef(null);
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    if (chartRef.current) chartRef.current.destroy();
+    chartRef.current = new Chart(canvasRef.current, {
+      type: "bar",
+      data: {
+        labels: data.map((d) => d.muscle),
+        datasets: [{ data: data.map((d) => d.volume), backgroundColor: data.map((d) => muscleColor(d.muscle)), borderRadius: 6, barThickness: 20 }],
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.x} kg total volume` } } },
+        scales: {
+          x: { grid: { color: C.line }, ticks: { color: C.taupe, font: { size: 11 } } },
+          y: { grid: { display: false }, ticks: { color: C.plum, font: { size: 12 } } },
+        },
+      },
+    });
+    return () => chartRef.current && chartRef.current.destroy();
+  }, [JSON.stringify(data)]);
+  return <div style={{ width: "100%", height: Math.max(160, data.length * 44) }}><canvas ref={canvasRef}></canvas></div>;
+}
+
+function SparklineChart({ points }) {
+  const canvasRef = useRef(null);
+  const chartRef = useRef(null);
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    if (chartRef.current) chartRef.current.destroy();
+    chartRef.current = new Chart(canvasRef.current, {
+      type: "line",
+      data: {
+        labels: points.map((p) => p.date),
+        datasets: [{ data: points.map((p) => p.weight), borderColor: C.rose, backgroundColor: C.rose, borderWidth: 2, pointRadius: 3, tension: 0.35 }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { enabled: true } },
+        scales: { x: { display: false }, y: { display: false } },
+      },
+    });
+    return () => chartRef.current && chartRef.current.destroy();
+  }, [JSON.stringify(points)]);
+  return <div style={{ width: "100%", height: 56 }}><canvas ref={canvasRef}></canvas></div>;
+}
+
+/* ------------------------------------------------------------------ */
+/* Dashboard                                                            */
+/* ------------------------------------------------------------------ */
+
+function Dashboard({ history, onStartDay, onImport, onReset }) {
+  const streak = computeStreak(history);
+  const thisWeek = computeThisWeekCount(history);
+  const prs = computePRs(history);
+  const topPRs = Object.entries(prs).sort((a, b) => b[1].weight - a[1].weight).slice(0, 3);
+
+  return (
+    <div className="px-4 pt-5 pb-4 flex flex-col gap-5">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold" style={{ color: C.plum, fontFamily: "Fraunces, serif" }}>My Fitness Journey</h1>
+        <Pill color={C.sageLight} textColor={C.sageDark}>4-month program</Pill>
+      </div>
+
+      <div className="flex gap-3">
+        <StatBox label="Streak" value={streak} icon={<IconFlame size={16} />} accent={C.gold} />
+        <StatBox label="This week" value={`${thisWeek}/4`} icon={<IconTimer size={16} />} accent={C.sage} />
+        <StatBox label="Total" value={history.length} icon={<IconDumbbell size={16} />} accent={C.rose} />
+      </div>
+
+      <div>
+        <h2 className="text-sm font-semibold mb-2" style={{ color: C.plum }}>Start a workout</h2>
+        <div className="flex flex-col gap-2">
+          {WORKOUT_PLAN.map((day) => (
+            <button key={day.id} onClick={() => onStartDay(day.id)}
+              className="flex items-center justify-between rounded-2xl px-4 py-3.5 text-left"
+              style={{ background: C.card, border: `1px solid ${C.line}` }}>
+              <div>
+                <div className="font-semibold text-sm" style={{ color: C.plum }}>{day.shortName}</div>
+                <div className="text-xs mt-0.5" style={{ color: C.taupe }}>{day.focus}</div>
+              </div>
+              <span className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: C.roseLighter, color: C.rose }}>
+                <IconChevronRight size={18} />
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-sm font-semibold mb-2" style={{ color: C.plum }}>Top personal records</h2>
+        <div className="flex flex-col gap-2">
+          {topPRs.length === 0 && <div className="text-sm" style={{ color: C.taupe }}>Log a workout to start setting PRs.</div>}
+          {topPRs.map(([name, pr]) => (
+            <div key={name} className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+              <TrophyBadge />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate" style={{ color: C.plum }}>{name}</div>
+                <div className="text-xs" style={{ color: C.taupe }}>{formatShortDate(pr.date)}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-semibold" style={{ color: C.rose }}>{pr.weight} kg</div>
+                <div className="text-xs" style={{ color: C.taupe }}>x{pr.reps}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <DataCard history={history} onImport={onImport} onReset={onReset} />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Workout screen                                                       */
+/* ------------------------------------------------------------------ */
+
+function ExerciseCard({ exercise, exIndex, history, onSetChange, onToggleComplete, onAddSet, onRemoveExercise }) {
+  const prevSets = useMemo(() => getPreviousForExercise(history, exercise.name), [history, exercise.name]);
+  return (
+    <div className="rounded-2xl p-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <div className="font-semibold text-sm" style={{ color: C.plum }}>{exercise.name}</div>
+          <Pill color={muscleColor(exercise.muscle) + "22"} textColor={muscleColor(exercise.muscle)}>{exercise.muscle}</Pill>
+        </div>
+        <button onClick={() => onRemoveExercise(exIndex)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ color: C.taupe }} aria-label="Remove exercise">
+          <IconX size={15} />
+        </button>
+      </div>
+      <div className="grid grid-cols-[28px_1fr_1fr_1fr_32px] gap-2 text-[11px] uppercase tracking-wide mb-1.5 px-1" style={{ color: C.taupe }}>
+        <div>Set</div><div>Previous</div><div>Weight kg</div><div>Reps</div><div />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {exercise.sets.map((set, si) => {
+          const prev = prevSets && prevSets[si] ? prevSets[si] : null;
+          return (
+            <div key={si} className="grid grid-cols-[28px_1fr_1fr_1fr_32px] gap-2 items-center rounded-xl px-1 py-1.5"
+              style={{ background: set.completed ? C.sageLight : "transparent" }}>
+              <div className="text-sm font-medium text-center" style={{ color: set.completed ? C.sageDark : C.plum }}>{si + 1}</div>
+              <div className="text-xs" style={{ color: C.taupe }}>{prev ? `${prev.weight}kg x${prev.reps}` : "—"}</div>
+              <input type="number" inputMode="decimal" value={set.weight === "" ? "" : set.weight}
+                onChange={(e) => onSetChange(exIndex, si, "weight", e.target.value)} placeholder="0"
+                className="w-full rounded-lg px-2 py-1.5 text-sm text-center outline-none" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.plum }} />
+              <input type="number" inputMode="numeric" value={set.reps === "" ? "" : set.reps}
+                onChange={(e) => onSetChange(exIndex, si, "reps", e.target.value)} placeholder="0"
+                className="w-full rounded-lg px-2 py-1.5 text-sm text-center outline-none" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.plum }} />
+              <button onClick={() => onToggleComplete(exIndex, si)} className="w-8 h-8 rounded-full flex items-center justify-center mx-auto"
+                style={{ background: set.completed ? C.sage : C.roseLighter, color: set.completed ? "#fff" : C.rose }} aria-label="Mark set complete">
+                <IconCheck size={15} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <button onClick={() => onAddSet(exIndex)} className="mt-3 w-full rounded-xl py-2 text-sm font-medium flex items-center justify-center gap-1.5"
+        style={{ border: `1.5px dashed ${C.taupeLight}`, color: C.taupe }}>
+        <IconPlus size={14} /> Add set
+      </button>
+    </div>
+  );
+}
+
+function ChecklistSection({ title, items }) {
+  const [checked, setChecked] = useState(() => items.map(() => false));
+  return (
+    <div className="rounded-2xl p-4" style={{ background: C.cardAlt, border: `1px solid ${C.line}` }}>
+      <div className="text-sm font-semibold mb-2" style={{ color: C.plum }}>{title}</div>
+      <div className="flex flex-col gap-1.5">
+        {items.map((item, i) => (
+          <button key={i} onClick={() => setChecked((c) => c.map((v, idx) => (idx === i ? !v : v)))} className="flex items-center gap-2.5 text-left">
+            <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: checked[i] ? C.sage : "#fff", border: `1.5px solid ${checked[i] ? C.sage : C.taupeLight}` }}>
+              {checked[i] && <IconCheck size={12} style={{ color: "#fff" }} />}
+            </span>
+            <span className="text-sm" style={{ color: checked[i] ? C.taupe : C.plum, textDecoration: checked[i] ? "line-through" : "none" }}>{item}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WorkoutScreen({ activeWorkout, history, setActiveWorkout, onFinish, onDiscard, onStartDay }) {
+  const [elapsed, setElapsed] = useState(0);
+  const [showPicker, setShowPicker] = useState(false);
+  const startRef = useRef(null);
+
+  useEffect(() => {
+    if (!activeWorkout) return;
+    startRef.current = new Date(activeWorkout.startedAt).getTime();
+    const tick = () => setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [activeWorkout?.startedAt]);
+
+  if (!activeWorkout) {
+    return (
+      <div className="px-4 pt-8 pb-4 flex flex-col items-center gap-4 text-center">
+        <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: C.roseLighter, color: C.rose }}><IconDumbbell size={26} /></div>
+        <div>
+          <div className="font-semibold" style={{ color: C.plum }}>No active workout</div>
+          <div className="text-sm mt-1" style={{ color: C.taupe }}>Pick a day to start logging.</div>
+        </div>
+        <div className="w-full flex flex-col gap-2 mt-2">
+          {WORKOUT_PLAN.map((day) => (
+            <button key={day.id} onClick={() => onStartDay(day.id)} className="rounded-2xl px-4 py-3 text-sm font-medium"
+              style={{ background: C.card, border: `1px solid ${C.line}`, color: C.plum }}>{day.shortName}</button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const mins = String(Math.floor(elapsed / 60)).padStart(2, "0");
+  const secs = String(elapsed % 60).padStart(2, "0");
+  const updateExercises = (fn) => setActiveWorkout((w) => ({ ...w, exercises: fn(w.exercises) }));
+  const onSetChange = (exIndex, setIndex, field, value) =>
+    updateExercises((exs) => exs.map((ex, i) => i !== exIndex ? ex : { ...ex, sets: ex.sets.map((s, si) => si !== setIndex ? s : { ...s, [field]: value === "" ? "" : Number(value) }) }));
+  const onToggleComplete = (exIndex, setIndex) =>
+    updateExercises((exs) => exs.map((ex, i) => i !== exIndex ? ex : { ...ex, sets: ex.sets.map((s, si) => si !== setIndex ? s : { ...s, completed: !s.completed }) }));
+  const onAddSet = (exIndex) =>
+    updateExercises((exs) => exs.map((ex, i) => i !== exIndex ? ex : { ...ex, sets: [...ex.sets, { weight: "", reps: "", completed: false }] }));
+  const onRemoveExercise = (exIndex) => updateExercises((exs) => exs.filter((_, i) => i !== exIndex));
+  const addExercise = (name) => {
+    updateExercises((exs) => [...exs, { name, muscle: MUSCLE_MAP[name] || "Other", sets: [{ weight: "", reps: "", completed: false }, { weight: "", reps: "", completed: false }, { weight: "", reps: "", completed: false }] }]);
+    setShowPicker(false);
+  };
+  const planDay = WORKOUT_PLAN.find((d) => d.id === activeWorkout.dayId);
+
+  return (
+    <div className="px-4 pt-5 pb-4 flex flex-col gap-4">
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="text-xs" style={{ color: C.taupe }}>{formatDate(activeWorkout.startedAt)}</div>
+          <h1 className="text-xl font-semibold" style={{ color: C.plum, fontFamily: "Fraunces, serif" }}>{activeWorkout.name}</h1>
+        </div>
+        <div className="flex items-center gap-1.5 rounded-full px-3 py-1.5" style={{ background: C.plum, color: "#fff" }}>
+          <IconTimer size={14} /><span className="text-sm font-medium tabular-nums">{mins}:{secs}</span>
+        </div>
+      </div>
+
+      {planDay && <ChecklistSection title="Warm-up" items={planDay.warmup} />}
+
+      <div className="flex flex-col gap-3">
+        {activeWorkout.exercises.map((ex, i) => (
+          <ExerciseCard key={i} exercise={ex} exIndex={i} history={history} onSetChange={onSetChange} onToggleComplete={onToggleComplete} onAddSet={onAddSet} onRemoveExercise={onRemoveExercise} />
+        ))}
+      </div>
+
+      <button onClick={() => setShowPicker((v) => !v)} className="rounded-2xl py-3 text-sm font-medium flex items-center justify-center gap-1.5" style={{ background: C.roseLighter, color: C.roseDark }}>
+        <IconPlus size={16} /> Add exercise
+        <IconChevronDown size={14} style={{ transform: showPicker ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+      </button>
+
+      {showPicker && (
+        <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: C.cardAlt, border: `1px solid ${C.line}` }}>
+          {Object.entries(EXTRA_EXERCISES).map(([muscle, list]) => (
+            <div key={muscle}>
+              <div className="text-xs font-semibold mb-1.5" style={{ color: muscleColor(muscle) }}>{muscle}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {list.map((name) => (
+                  <button key={name} onClick={() => addExercise(name)} className="px-3 py-1.5 rounded-full text-xs font-medium" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.plum }}>{name}</button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {planDay && <ChecklistSection title="Cooldown" items={planDay.cooldown} />}
+
+      <div className="flex gap-3 mt-1">
+        <button onClick={onDiscard} className="flex-1 rounded-2xl py-3 text-sm font-semibold" style={{ background: "transparent", border: `1.5px solid ${C.taupeLight}`, color: C.taupe }}>Discard</button>
+        <button onClick={() => onFinish(elapsed)} className="flex-1 rounded-2xl py-3 text-sm font-semibold" style={{ background: C.rose, color: "#fff" }}>Finish workout</button>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* History screen                                                       */
+/* ------------------------------------------------------------------ */
+
+function HistoryScreen({ history }) {
+  const prFlagsBySession = useMemo(() => {
+    const sorted = [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const running = {}, flags = {};
+    sorted.forEach((session) => {
+      flags[session.id] = {};
+      session.exercises.forEach((ex) => {
+        const b = bestSet(ex.sets);
+        if (!b) return;
+        const priorMax = running[ex.name] ?? -1;
+        if (b.weight > priorMax) { flags[session.id][ex.name] = true; running[ex.name] = b.weight; }
+      });
+    });
+    return flags;
+  }, [history]);
+
+  const sorted = [...history].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  return (
+    <div className="px-4 pt-5 pb-4 flex flex-col gap-3">
+      <h1 className="text-2xl font-semibold" style={{ color: C.plum, fontFamily: "Fraunces, serif" }}>History</h1>
+      {sorted.length === 0 && <div className="text-sm mt-4" style={{ color: C.taupe }}>No workouts logged yet.</div>}
+      {sorted.map((session) => {
+        const prFlags = prFlagsBySession[session.id] || {};
+        return (
+          <div key={session.id} className="rounded-2xl p-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <div className="font-semibold text-sm" style={{ color: C.plum }}>{session.name}</div>
+                <div className="text-xs mt-0.5" style={{ color: C.taupe }}>{formatDate(session.date)} · {session.durationMin} min · {totalSets(session)} sets</div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {session.exercises.map((ex) => (
+                <Pill key={ex.name} color={muscleColor(ex.muscle) + "1F"} textColor={muscleColor(ex.muscle)}>
+                  {ex.name}{prFlags[ex.name] && <IconTrophy size={11} style={{ color: C.gold }} />}
+                </Pill>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Progress screen                                                      */
+/* ------------------------------------------------------------------ */
+
+function ProgressScreen({ history }) {
+  const weekStart = startOfWeek(new Date());
+  const volumeData = useMemo(() => {
+    const totals = {};
+    history.filter((s) => new Date(s.date) >= weekStart).forEach((s) =>
+      s.exercises.forEach((ex) => {
+        const vol = ex.sets.reduce((sum, st) => sum + (st.completed ? (Number(st.weight) || 0) * (Number(st.reps) || 0) : 0), 0);
+        totals[ex.muscle] = (totals[ex.muscle] || 0) + vol;
+      })
+    );
+    return Object.entries(totals).map(([muscle, volume]) => ({ muscle, volume: Math.round(volume) })).sort((a, b) => b.volume - a.volume);
+  }, [history]);
+
+  const exerciseNames = useMemo(() => {
+    const seen = new Map();
+    [...history].sort((a, b) => new Date(b.date) - new Date(a.date)).forEach((s) => s.exercises.forEach((ex) => seen.set(ex.name, true)));
+    return Array.from(seen.keys()).slice(0, 8);
+  }, [history]);
+
+  return (
+    <div className="px-4 pt-5 pb-4 flex flex-col gap-5">
+      <h1 className="text-2xl font-semibold" style={{ color: C.plum, fontFamily: "Fraunces, serif" }}>Progress</h1>
+      <WeeklySummaryCard history={history} />
+      <div>
+        <h2 className="text-sm font-semibold mb-2" style={{ color: C.plum }}>Weekly volume by muscle group</h2>
+        <div className="rounded-2xl p-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+          {volumeData.length === 0 ? <div className="text-sm" style={{ color: C.taupe }}>No sets logged yet this week.</div> : <VolumeBarChart data={volumeData} />}
+        </div>
+      </div>
+      <div>
+        <h2 className="text-sm font-semibold mb-2" style={{ color: C.plum }}>Strength trends</h2>
+        <div className="flex flex-col gap-3">
+          {exerciseNames.map((name) => {
+            const points = history.filter((s) => s.exercises.some((e) => e.name === name)).sort((a, b) => new Date(a.date) - new Date(b.date))
+              .map((s) => { const ex = s.exercises.find((e) => e.name === name); const b = bestSet(ex.sets); return { date: formatShortDate(s.date), weight: b ? b.weight : 0, reps: b ? b.reps : 0 }; });
+            if (points.length === 0) return null;
+            const pr = points.reduce((best, p) => (p.weight > (best?.weight ?? -1) ? p : best), null);
+            const muscle = MUSCLE_MAP[name] || "Other";
+            return (
+              <div key={name} className="rounded-2xl p-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+                <div className="flex items-center justify-between mb-1">
+                  <div>
+                    <div className="text-sm font-semibold" style={{ color: C.plum }}>{name}</div>
+                    <Pill color={muscleColor(muscle) + "22"} textColor={muscleColor(muscle)}>{muscle}</Pill>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs" style={{ color: C.taupe }}>Current PR</div>
+                    <div className="text-base font-semibold" style={{ color: C.rose }}>{pr.weight} kg x{pr.reps}</div>
+                  </div>
+                </div>
+                <SparklineChart points={points} />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Bottom nav                                                           */
+/* ------------------------------------------------------------------ */
+
+function BottomNav({ screen, setScreen, hasActiveWorkout }) {
+  const items = [
+    { id: "dashboard", label: "Dashboard", Icon: IconHome },
+    { id: "workout", label: "Workout", Icon: IconDumbbell },
+    { id: "history", label: "History", Icon: IconList },
+    { id: "progress", label: "Progress", Icon: IconTrendUp },
+  ];
+  return (
+    <div className="flex items-center justify-around px-2 py-2 sticky bottom-0" style={{ background: C.card, borderTop: `1px solid ${C.line}` }}>
+      {items.map(({ id, label, Icon }) => {
+        const active = screen === id;
+        return (
+          <button key={id} onClick={() => setScreen(id)} className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl relative" style={{ color: active ? C.rose : C.taupe }}>
+            <Icon size={20} />
+            <span className="text-[10px] font-medium">{label}</span>
+            {id === "workout" && hasActiveWorkout && <span className="absolute top-0 right-1.5 w-2 h-2 rounded-full" style={{ background: C.sage }} />}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* App                                                                   */
+/* ------------------------------------------------------------------ */
+
+function FitnessTracker() {
+  const [history, setHistory] = useState(() => loadJSON(HISTORY_KEY, null) || []);
+  const [activeWorkout, setActiveWorkout] = useState(() => loadJSON(ACTIVE_KEY, null));
+  const [screen, setScreen] = useState("dashboard");
+
+  useEffect(() => saveJSON(HISTORY_KEY, history), [history]);
+  useEffect(() => saveJSON(ACTIVE_KEY, activeWorkout), [activeWorkout]);
+
+  const startDay = (dayId) => {
+    const plan = WORKOUT_PLAN.find((d) => d.id === dayId);
+    setActiveWorkout({
+      id: uid(), dayId, name: plan.name, startedAt: new Date().toISOString(),
+      exercises: plan.exercises.map((e) => ({ name: e.name, muscle: e.muscle, sets: Array.from({ length: e.targetSets }, () => ({ weight: "", reps: "", completed: false })) })),
+    });
+    setScreen("workout");
+  };
+
+  const finishWorkout = (elapsedSeconds) => {
+    const plan = WORKOUT_PLAN.find((d) => d.id === activeWorkout.dayId);
+    const cleanExercises = activeWorkout.exercises
+      .map((ex) => ({ ...ex, sets: ex.sets.filter((s) => s.completed && s.weight !== "" && s.reps !== "") }))
+      .filter((ex) => ex.sets.length > 0);
+
+    if (cleanExercises.length === 0) {
+      if (!window.confirm("No completed sets were logged. Discard this workout?")) return;
+      setActiveWorkout(null); setScreen("dashboard"); return;
+    }
+    const session = {
+      id: uid(), dayId: activeWorkout.dayId, name: plan.shortName.replace(/^Day \d: /, ""),
+      date: activeWorkout.startedAt, durationMin: Math.max(1, Math.round(elapsedSeconds / 60)), exercises: cleanExercises,
+    };
+    setHistory((h) => [...h, session]);
+    setActiveWorkout(null);
+    setScreen("history");
+  };
+
+  const discardWorkout = () => {
+    if (window.confirm("Discard this workout? Your logged sets will be lost.")) { setActiveWorkout(null); setScreen("dashboard"); }
+  };
+
+  const clearAllData = () => {
+    if (window.confirm("Clear all logged workouts? This can't be undone.")) {
+      localStorage.removeItem(HISTORY_KEY);
+      localStorage.removeItem(ACTIVE_KEY);
+      setHistory([]);
+      setActiveWorkout(null);
+      setScreen("dashboard");
+    }
+  };
+
+  const importHistory = (list) => {
+    setHistory(list);
+  };
+
+  return (
+    <div className="w-full max-w-md mx-auto flex flex-col" style={{ background: C.bg, minHeight: "100vh" }}>
+      <div className="flex-1 overflow-y-auto">
+        {screen === "dashboard" && (
+          <Dashboard
+            history={history}
+            onStartDay={startDay}
+            onImport={importHistory}
+            onReset={clearAllData}
+          />
+        )}
+        {screen === "workout" && <WorkoutScreen activeWorkout={activeWorkout} history={history.filter((h) => !activeWorkout || h.id !== activeWorkout.id)} setActiveWorkout={setActiveWorkout} onFinish={finishWorkout} onDiscard={discardWorkout} onStartDay={startDay} />}
+        {screen === "history" && <HistoryScreen history={history} />}
+        {screen === "progress" && <ProgressScreen history={history} />}
+      </div>
+      <BottomNav screen={screen} setScreen={setScreen} hasActiveWorkout={!!activeWorkout} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<FitnessTracker />);
+</script>
+</body>
+</html>

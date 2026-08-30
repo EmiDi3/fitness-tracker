@@ -75,6 +75,7 @@ const C = {
 const MUSCLE_PALETTE = ["#C4677A", "#7C9473", "#D9A441", "#9B6A8C", "#6E8CA0", "#B98058", "#8D8360", "#B4849C"];
 
 function muscleColor(muscle) {
+  if (muscle === "Cardio") return "#6E8CA0";
   const order = ["Chest", "Shoulders", "Triceps", "Quads", "Glutes", "Calves", "Core", "Hamstrings", "Back", "Rear Delts", "Biceps", "Posterior Chain"];
   const idx = order.indexOf(muscle);
   return MUSCLE_PALETTE[(idx >= 0 ? idx : muscle.length) % MUSCLE_PALETTE.length];
@@ -112,71 +113,161 @@ const IconUpload = (p) => <Icon {...p}><path d="M12 21V9M7 13l5-5 5 5" /><path d
 /* ------------------------------------------------------------------ */
 
 const WORKOUT_PLAN = [
-  { id: "day1", shortName: "Day 1: Lower Body (Quads & Glutes)", name: "Quads & Glutes", focus: "Quads, Glutes, Calves",
-    warmup: ["5 min easy bike", "Leg swings x10 each way", "Bodyweight squats x15", "Hip circles x10 each way"],
-    cooldown: ["Quad stretch, 30s/side", "Hip flexor stretch, 30s/side", "Calf stretch, 30s/side"],
+  { id: "day1", shortName: "Day 1: Lower A (Hinge & Glute)", name: "Lower A", focus: "Glutes, Hamstrings, Calves",
+    warmup: ["5 min easy bike — finish around 120 bpm", "Leg swings x10 each way", "Glute bridges x15", "Hip circles x10 each way", "Ramp the hip thrust: 2 build-up sets, then work"],
+    cooldown: ["Hip flexor stretch, 45s x2/side", "Hamstring stretch, 45s x2/side", "Glute stretch, 45s x2/side", "Calf stretch, 30s/side"],
     exercises: [
-      { name: "Back Squat", muscle: "Quads", targetSets: 4, targetReps: "6-8" },
-      { name: "Hip Thrust", muscle: "Glutes", targetSets: 4, targetReps: "8-10" },
-      { name: "Bulgarian Split Squat", muscle: "Glutes", targetSets: 3, targetReps: "10/leg" },
-      { name: "Leg Press", muscle: "Quads", targetSets: 3, targetReps: "10-12" },
-      { name: "Leg Extension", muscle: "Quads", targetSets: 3, targetReps: "12-15" },
-      { name: "Standing Calf Raise", muscle: "Calves", targetSets: 3, targetReps: "12-15" },
+      { name: "Hip Thrust", muscle: "Glutes", targetSets: 4, targetReps: "8-10", rest: "2:00", note: "Shins vertical at the top. Ribs down — do not hyperextend." },
+      { name: "Romanian Deadlift", muscle: "Hamstrings", targetSets: 3, targetReps: "8-10", rest: "2:00", note: "Hinge, not squat. Bar stays close to the legs." },
+      { name: "Bulgarian Split Squat", muscle: "Glutes", targetSets: 3, targetReps: "10/leg", rest: "1:30", note: "Long stride = more glute." },
+      { name: "Seated Leg Curl", muscle: "Hamstrings", targetSets: 3, targetReps: "12", rest: "1:30", note: "Seated beats lying — hips flexed puts the hamstrings at a longer length. Sit upright, do not lean back." },
+      { name: "Cable Hip Abduction", muscle: "Glutes", targetSets: 4, targetReps: "15", rest: "0:60", note: "Glute medius — upper-hip width. Superset with the calf raise." },
+      { name: "Standing Calf Raise", muscle: "Calves", targetSets: 2, targetReps: "15", rest: "0:60", note: "Knee straight — gastrocnemius." },
     ] },
-  { id: "day2", shortName: "Day 2: Lower Body (Posterior & Glutes)", name: "Posterior Chain & Glutes", focus: "Hamstrings, Glutes, Core",
-    warmup: ["5 min row", "Glute bridges x15", "Band lateral walks x10 each way", "Cat-cow x10"],
-    cooldown: ["Hamstring stretch, 30s/side", "Lower back stretch, 30s", "Glute stretch, 30s/side"],
+  { id: "day2", shortName: "Day 2: Upper A (Push + Core)", name: "Upper A", focus: "Chest, Shoulders, Lats, Core",
+    warmup: ["5 min row or bike", "Arm circles x20 each way", "Band pull-aparts x15", "Shoulder dislocates x10"],
+    cooldown: ["Chest stretch, 45s/side", "Lat stretch, 45s/side", "Triceps & biceps stretch, 45s/side", "Child's pose, 45s"],
     exercises: [
-      { name: "Conventional Deadlift", muscle: "Posterior Chain", targetSets: 4, targetReps: "5" },
-      { name: "Romanian Deadlift", muscle: "Hamstrings", targetSets: 3, targetReps: "8-10" },
-      { name: "Cable Kickback", muscle: "Glutes", targetSets: 3, targetReps: "12-15/leg" },
-      { name: "Lying Leg Curl", muscle: "Hamstrings", targetSets: 3, targetReps: "12-15" },
-      { name: "Back Extension", muscle: "Glutes", targetSets: 3, targetReps: "12-15" },
-      { name: "Hanging Leg Raise", muscle: "Core", targetSets: 3, targetReps: "12-15" },
+      { name: "Barbell Bench Press", muscle: "Chest", targetSets: 3, targetReps: "6-8", rest: "2:00", note: "Flat — sternal (mid/lower) chest." },
+      { name: "Lat Pulldown", muscle: "Back", targetSets: 3, targetReps: "8-10", rest: "2:00" },
+      { name: "Seated DB Shoulder Press", muscle: "Shoulders", targetSets: 3, targetReps: "8-10", rest: "1:30" },
+      { name: "Lateral Raise", muscle: "Shoulders", targetSets: 2, targetReps: "15", rest: "0:60", note: "Medial delt — shoulder width. Superset with face pull." },
+      { name: "Face Pull", muscle: "Rear Delts", targetSets: 2, targetReps: "15", rest: "0:60" },
+      { name: "Triceps Rope Pushdown", muscle: "Triceps", targetSets: 2, targetReps: "12", rest: "0:60", note: "Superset with the curl." },
+      { name: "DB Bicep Curl", muscle: "Biceps", targetSets: 2, targetReps: "12", rest: "0:60" },
+      { name: "Hanging Leg Raise", muscle: "Core", targetSets: 3, targetReps: "10-12", rest: "0:60", note: "Lower abs. Superset with the Pallof press." },
+      { name: "Pallof Press", muscle: "Core", targetSets: 2, targetReps: "12/side", rest: "0:60", note: "Anti-rotation — obliques. Resist the twist, do not create it." },
     ] },
-  { id: "day3", shortName: "Day 3: Mixed (Glutes + Core)", name: "Mixed", focus: "Glutes, Quads, Core, Rear Delts",
-    warmup: ["5 min bike or row", "Hip circles x10 each way", "Dynamic hip flexor stretch", "Cat-cow x10"],
-    cooldown: ["Hip flexor stretch, 30s/side", "Glute stretch, 30s/side", "Lower back stretch, 30s"],
+  { id: "day3", shortName: "Day 3: Lower B (Squat & Glute)", name: "Lower B", focus: "Quads, Glutes, Calves",
+    warmup: ["5 min easy bike — finish around 120 bpm", "Bodyweight squats x15", "Hip circles x10 each way", "Cat-cow x10", "Ramp the squat: 2 build-up sets, then work"],
+    cooldown: ["Quad stretch, 45s x2/side", "Hip flexor stretch, 45s x2/side", "Glute stretch, 45s x2/side", "Calf stretch, 30s/side"],
     exercises: [
-      { name: "Goblet Squat", muscle: "Quads", targetSets: 3, targetReps: "10-12" },
-      { name: "Walking Lunges", muscle: "Glutes", targetSets: 3, targetReps: "10/leg" },
-      { name: "Cable Hip Abduction", muscle: "Glutes", targetSets: 3, targetReps: "15/leg" },
-      { name: "Face Pull", muscle: "Rear Delts", targetSets: 3, targetReps: "15" },
-      { name: "Cable Crunch", muscle: "Core", targetSets: 3, targetReps: "15" },
-      { name: "Plank", muscle: "Core", targetSets: 3, targetReps: "45s" },
+      { name: "Back Squat", muscle: "Quads", targetSets: 4, targetReps: "6-8", rest: "2:00" },
+      { name: "Hip Thrust", muscle: "Glutes", targetSets: 3, targetReps: "10", rest: "2:00", note: "2nd weekly exposure — lighter than Day 1." },
+      { name: "Leg Press", muscle: "Quads", targetSets: 3, targetReps: "10-12", rest: "2:00", note: "Feet higher = more glute/hamstring." },
+      { name: "Back Extension", muscle: "Glutes", targetSets: 3, targetReps: "12", rest: "1:30", note: "Round the upper back slightly so glutes work, not lower back." },
+      { name: "Glute Kickback Machine", muscle: "Glutes", targetSets: 3, targetReps: "12/leg", rest: "0:60", note: "If the machine allows, angle the leg out 30-45 degrees rather than straight back. Superset with abduction." },
+      { name: "Cable Hip Abduction", muscle: "Glutes", targetSets: 3, targetReps: "15", rest: "0:60" },
+      { name: "Seated Calf Raise", muscle: "Calves", targetSets: 2, targetReps: "15", rest: "0:60", note: "Knee bent — soleus. A different muscle from the standing version." },
     ] },
-  { id: "day4", shortName: "Day 4: Upper Body", name: "Upper Body", focus: "Chest, Back, Shoulders, Arms",
-    warmup: ["5 min row", "Arm circles x20 each way", "Band pull-aparts x15", "Shoulder dislocates x10"],
-    cooldown: ["Chest stretch, 30s/side", "Lat stretch, 30s/side", "Triceps & biceps stretch, 30s/side"],
+  { id: "day4", shortName: "Day 4: Upper B (Pull + Core)", name: "Upper B", focus: "Back, Chest, Shoulders, Core",
+    warmup: ["5 min row", "Arm circles x20 each way", "Band pull-aparts x15", "Scapular pull-ups or dead hangs x5"],
+    cooldown: ["Lat stretch, 45s/side", "Chest stretch, 45s/side", "Triceps & biceps stretch, 45s/side", "Child's pose, 45s"],
     exercises: [
-      { name: "Barbell Bench Press", muscle: "Chest", targetSets: 4, targetReps: "6-8" },
-      { name: "Barbell Row", muscle: "Back", targetSets: 4, targetReps: "8-10" },
-      { name: "Seated DB Shoulder Press", muscle: "Shoulders", targetSets: 3, targetReps: "8-10" },
-      { name: "Lat Pulldown", muscle: "Back", targetSets: 3, targetReps: "10-12" },
-      { name: "Triceps Rope Pushdown", muscle: "Triceps", targetSets: 3, targetReps: "10-12" },
-      { name: "Rear Delt Fly", muscle: "Rear Delts", targetSets: 3, targetReps: "12-15" },
-      { name: "DB Bicep Curl", muscle: "Biceps", targetSets: 3, targetReps: "10-12" },
+      { name: "Barbell Row", muscle: "Back", targetSets: 3, targetReps: "8-10", rest: "2:00" },
+      { name: "Incline DB Press", muscle: "Chest", targetSets: 3, targetReps: "8-10", rest: "2:00", note: "Incline — upper chest, the half flat bench misses." },
+      { name: "Assisted Pull-Up", muscle: "Back", targetSets: 3, targetReps: "8-10", rest: "1:30", note: "Or close-grip pulldown." },
+      { name: "Lateral Raise", muscle: "Shoulders", targetSets: 3, targetReps: "12-15", rest: "0:60", note: "Shoulder width. Superset with face pull." },
+      { name: "Face Pull", muscle: "Rear Delts", targetSets: 2, targetReps: "15", rest: "0:60" },
+      { name: "Overhead DB Extension", muscle: "Triceps", targetSets: 2, targetReps: "12", rest: "0:60", note: "Long head — the only head pushdowns miss. Superset with the curl." },
+      { name: "Hammer Curl", muscle: "Biceps", targetSets: 2, targetReps: "12", rest: "0:60", note: "Neutral grip — brachialis." },
+      { name: "Cable Crunch", muscle: "Core", targetSets: 3, targetReps: "12", rest: "0:60", note: "Upper abs. Superset with the side plank." },
+      { name: "Side Plank", muscle: "Core", targetSets: 2, targetReps: "30s/side", rest: "0:60", note: "Lateral flexion — obliques and QL." },
     ] },
 ];
 
 const MUSCLE_MAP = {};
 WORKOUT_PLAN.forEach((d) => d.exercises.forEach((e) => (MUSCLE_MAP[e.name] = e.muscle)));
 
+// Exercises from the previous body-part split. They are no longer in the plan, but
+// sessions logged before 31.08.2026 still contain them — keep them mapped so old
+// history keeps its muscle colours and stays in the volume charts.
+const LEGACY_MUSCLE_MAP = {
+  "Conventional Deadlift": "Posterior Chain", "Goblet Squat": "Quads", "Walking Lunges": "Glutes",
+  "Leg Extension": "Quads", "Plank": "Core", "Russian Twist": "Core", "Rear Delt Fly": "Rear Delts",
+  "Seated Cable Row": "Back", "Cable Crunch": "Core", "Hanging Leg Raise": "Core",
+  "Cable Kickback": "Glutes", "Lying Leg Curl": "Hamstrings",
+};
+Object.entries(LEGACY_MUSCLE_MAP).forEach(([n, m]) => { if (!MUSCLE_MAP[n]) MUSCLE_MAP[n] = m; });
+
 const EXTRA_EXERCISES = {
-  Chest: ["Incline DB Press", "Cable Fly", "Push-Ups", "Machine Chest Press"],
+  Chest: ["Barbell Bench Press", "Incline DB Press", "Cable Fly", "Push-Ups", "Machine Chest Press"],
   Shoulders: ["Arnold Press", "Front Raise", "Cable Lateral Raise", "Machine Shoulder Press"],
-  Triceps: ["Overhead DB Extension", "Close-Grip Bench Press", "Assisted Dips"],
-  Quads: ["Front Squat", "Step-Ups"],
-  Glutes: ["Glute Bridge", "Curtsy Lunge", "Single-Leg Hip Thrust"],
-  Calves: ["Seated Calf Raise"],
-  Core: ["Russian Twist", "Ab Wheel Rollout"],
-  Hamstrings: ["Good Morning"],
+  Triceps: ["Triceps Rope Pushdown", "Close-Grip Bench Press", "Assisted Dips"],
+  Quads: ["Front Squat", "Goblet Squat", "Leg Extension", "Step-Ups"],
+  Glutes: ["Glute Bridge", "Curtsy Lunge", "Walking Lunges", "Single-Leg Hip Thrust", "Frog Pump", "Cable Kickback"],
+  Calves: ["Standing Calf Raise", "Seated Calf Raise"],
+  Core: ["Plank", "Russian Twist", "Ab Wheel Rollout", "Pallof Press", "Side Plank"],
+  Hamstrings: ["Good Morning", "Seated Leg Curl", "Lying Leg Curl", "Nordic Curl"],
   Back: ["T-Bar Row", "Single-Arm DB Row", "Straight-Arm Pulldown", "Seated Cable Row", "Assisted Pull-Ups"],
-  "Rear Delts": ["Reverse Pec Deck"],
+  "Rear Delts": ["Reverse Pec Deck", "Face Pull"],
   Biceps: ["Cable Curl", "Preacher Curl", "Hammer Curl"],
-  "Posterior Chain": ["Sumo Deadlift", "Kettlebell Swing"],
+  "Posterior Chain": ["Conventional Deadlift", "Sumo Deadlift", "Kettlebell Swing"],
 };
 Object.entries(EXTRA_EXERCISES).forEach(([muscle, list]) => list.forEach((name) => (MUSCLE_MAP[name] = muscle)));
+
+/* ------------------------------------------------------------------ */
+/* Cardio: Norwegian 4x4 VO2max intervals                              */
+/* ------------------------------------------------------------------ */
+
+// Age-predicted max HR (Tanaka: 208 - 0.7 x age). Carries +/-10-12 bpm of
+// individual error, so it is shown as a reference only. Once three cardio
+// sessions are logged the app uses the highest BPM actually recorded instead.
+const HR_MAX_ESTIMATE = 192;
+const CARDIO_EXERCISE = "VO2max Intervals";
+
+// Beginner on-ramp. Four minutes at 90-95% HRmax is not something an
+// untrained person can hold, so the interval length grows with experience.
+const CARDIO_PHASES = [
+  { minSessions: 0, label: "Phase 1 - weeks 1-2", workMin: 2, restMin: 2, rounds: 4, rpe: "7", cue: "Hard. Short sentences only." },
+  { minSessions: 2, label: "Phase 2 - weeks 3-4", workMin: 3, restMin: 3, rounds: 4, rpe: "8", cue: "Very hard. A few words at a time." },
+  { minSessions: 4, label: "Phase 3 - the full 4x4", workMin: 4, restMin: 3, rounds: 4, rpe: "8-9", cue: "One or two words. 90-95% max HR." },
+];
+
+function cardioSets(session) {
+  return session.exercises.reduce((acc, ex) => acc.concat(ex.sets), []);
+}
+function peakBpm(session) {
+  const vals = cardioSets(session).map((s) => Number(s.bpm) || 0).filter((v) => v > 0);
+  return vals.length ? Math.max(...vals) : null;
+}
+function avgRpe(session) {
+  const vals = cardioSets(session).map((s) => Number(s.rpe) || 0).filter((v) => v > 0);
+  return vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
+}
+function cardioSessions(history) {
+  return history.filter((s) => s.kind === "cardio");
+}
+function cardioPhaseFor(history) {
+  const done = cardioSessions(history).length;
+  return [...CARDIO_PHASES].reverse().find((p) => done >= p.minSessions) || CARDIO_PHASES[0];
+}
+function observedMaxBpm(history) {
+  let max = 0;
+  cardioSessions(history).forEach((s) =>
+    s.exercises.forEach((ex) => ex.sets.forEach((st) => { const v = Number(st.bpm) || 0; if (v > max) max = v; }))
+  );
+  return max;
+}
+// Two different targets, deliberately not mixed:
+//  - Before three sessions there is no personal data, so fall back to the age
+//    formula and show a 90-95% band from it.
+//  - After that, use the highest BPM she has actually recorded. That peak was
+//    already produced by a near-maximal effort, so taking 90-95% OF it would
+//    lower the target every session and ratchet the work downwards. It is a
+//    mark to match or beat, not a number to take a percentage of.
+function cardioTarget(history) {
+  const observed = observedMaxBpm(history);
+  if (cardioSessions(history).length >= 3 && observed > 0) {
+    return { kind: "observed", bpm: observed, label: `match or beat ${observed} bpm`, source: "your best recorded interval" };
+  }
+  const low = Math.round(HR_MAX_ESTIMATE * 0.9), high = Math.round(HR_MAX_ESTIMATE * 0.95);
+  return { kind: "estimate", bpm: HR_MAX_ESTIMATE, label: `${low}-${high} bpm`, source: "age estimate, +/-10 bpm" };
+}
+
+const CARDIO_DAY = {
+  id: "cardio", kind: "cardio",
+  shortName: "Cardio: VO2max Intervals",
+  name: "VO2max Intervals",
+  focus: "Heart & lungs - bike or rower, not running",
+  warmup: ["10 min easy bike or row, building gradually", "Finish the warm-up at ~120 bpm, breathing deeper", "Hold back on interval 1 - every interval should match"],
+  cooldown: ["5 min very easy spinning", "Quad stretch, 45s/side", "Hamstring stretch, 45s/side", "Calf stretch, 30s/side"],
+};
+
+const ALL_DAYS = [...WORKOUT_PLAN, CARDIO_DAY];
+function findDay(id) {
+  return ALL_DAYS.find((d) => d.id === id);
+}
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                              */
@@ -203,7 +294,7 @@ function bestSet(exSets) {
 }
 function computePRs(history) {
   const prs = {};
-  const sorted = [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
+  const sorted = [...history].filter((s) => s.kind !== "cardio").sort((a, b) => new Date(a.date) - new Date(b.date));
   sorted.forEach((session) => {
     session.exercises.forEach((ex) => {
       const b = bestSet(ex.sets);
@@ -231,7 +322,11 @@ function computeStreak(history) {
 }
 function computeThisWeekCount(history) {
   const weekStart = startOfWeek(new Date());
-  return history.filter((s) => new Date(s.date) >= weekStart).length;
+  return history.filter((s) => new Date(s.date) >= weekStart && s.kind !== "cardio").length;
+}
+function computeCardioThisWeek(history) {
+  const weekStart = startOfWeek(new Date());
+  return cardioSessions(history).filter((s) => new Date(s.date) >= weekStart).length;
 }
 function getPreviousForExercise(history, exerciseName) {
   const past = history
@@ -271,13 +366,14 @@ function csvEscape(value) {
   return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
 }
 function exportHistoryCSV(history) {
-  const rows = [["Date", "Workout", "Exercise", "Muscle", "Set", "Weight (kg)", "Reps"]];
+  const rows = [["Date", "Workout", "Exercise", "Muscle", "Set", "Weight (kg)", "Reps", "BPM", "RPE"]];
   [...history]
     .sort((a, b) => new Date(a.date) - new Date(b.date))
     .forEach((session) => {
       session.exercises.forEach((ex) => {
         ex.sets.forEach((s, i) => {
-          rows.push([new Date(session.date).toISOString().slice(0, 10), session.name, ex.name, ex.muscle, i + 1, s.weight, s.reps]);
+          rows.push([new Date(session.date).toISOString().slice(0, 10), session.name, ex.name, ex.muscle, i + 1,
+            s.weight ?? "", s.reps ?? "", s.bpm ?? "", s.rpe ?? ""]);
         });
       });
     });
@@ -309,7 +405,9 @@ function buildWeeklySummary(history) {
 
   const lines = [];
   lines.push(`Weekly training summary (${formatShortDate(weekStart.toISOString())} – ${formatShortDate(new Date().toISOString())})`);
-  lines.push(`Workouts this week: ${weekSessions.length}/4  |  Current streak: ${computeStreak(history)} days  |  Total logged: ${history.filter((s) => !s.isSeed).length}`);
+  const strengthSessions = weekSessions.filter((s) => s.kind !== "cardio");
+  const cardioWeek = weekSessions.filter((s) => s.kind === "cardio");
+  lines.push(`Strength workouts this week: ${strengthSessions.length}/4  |  Cardio sessions: ${cardioWeek.length}  |  Current streak: ${computeStreak(history)} days  |  Total logged: ${history.filter((s) => !s.isSeed).length}`);
   lines.push("");
 
   if (weekSessions.length === 0) {
@@ -318,6 +416,16 @@ function buildWeeklySummary(history) {
     const muscleTotals = {};
     weekSessions.forEach((session) => {
       lines.push(`${session.name} — ${formatDate(session.date)} (${session.durationMin} min)`);
+      if (session.kind === "cardio") {
+        lines.push(`  - ${session.phase || "intervals"}: ${session.rounds || 4} x ${session.workMin} min hard`);
+        session.exercises.forEach((ex) =>
+          ex.sets.forEach((st, i) =>
+            lines.push(`  - Interval ${i + 1}: ${st.bpm ? st.bpm + " bpm" : "no HR recorded"}, RPE ${st.rpe || "—"}`)
+          )
+        );
+        lines.push("");
+        return;
+      }
       session.exercises.forEach((ex) => {
         const b = bestSet(ex.sets);
         const vol = ex.sets.reduce((sum, s) => sum + (s.completed ? (Number(s.weight) || 0) * (Number(s.reps) || 0) : 0), 0);
@@ -529,6 +637,8 @@ function SparklineChart({ points }) {
 function Dashboard({ history, onStartDay, onImport, onReset }) {
   const streak = computeStreak(history);
   const thisWeek = computeThisWeekCount(history);
+  const cardioWeek = computeCardioThisWeek(history);
+  const cardioPhase = cardioPhaseFor(history);
   const prs = computePRs(history);
   const topPRs = Object.entries(prs).sort((a, b) => b[1].weight - a[1].weight).slice(0, 3);
 
@@ -565,6 +675,27 @@ function Dashboard({ history, onStartDay, onImport, onReset }) {
       </div>
 
       <div>
+        <h2 className="text-sm font-semibold mb-2" style={{ color: C.plum }}>Cardio</h2>
+        <button onClick={() => onStartDay("cardio")}
+          className="w-full flex items-center justify-between rounded-2xl px-4 py-3.5 text-left"
+          style={{ background: C.card, border: `1px solid ${C.line}` }}>
+          <div className="min-w-0">
+            <div className="font-semibold text-sm" style={{ color: C.plum }}>{CARDIO_DAY.shortName}</div>
+            <div className="text-xs mt-0.5" style={{ color: C.taupe }}>{CARDIO_DAY.focus}</div>
+            <div className="text-xs mt-1" style={{ color: muscleColor("Cardio") }}>
+              {cardioPhase.label} · {cardioPhase.rounds} × {cardioPhase.workMin} min · {cardioWeek} done this week
+            </div>
+          </div>
+          <span className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: muscleColor("Cardio") + "22", color: muscleColor("Cardio") }}>
+            <IconChevronRight size={18} />
+          </span>
+        </button>
+        <div className="text-[11px] mt-1.5 px-1" style={{ color: C.taupe }}>
+          Once a week is enough. Do it after lifting or on a rest day — never before.
+        </div>
+      </div>
+
+      <div>
         <h2 className="text-sm font-semibold mb-2" style={{ color: C.plum }}>Top personal records</h2>
         <div className="flex flex-col gap-2">
           {topPRs.length === 0 && <div className="text-sm" style={{ color: C.taupe }}>Log a workout to start setting PRs.</div>}
@@ -593,14 +724,67 @@ function Dashboard({ history, onStartDay, onImport, onReset }) {
 /* Workout screen                                                       */
 /* ------------------------------------------------------------------ */
 
+function CardioIntervalCard({ exercise, exIndex, history, phase, onSetChange, onToggleComplete }) {
+  const prevSets = useMemo(() => getPreviousForExercise(history, exercise.name), [history, exercise.name]);
+  const target = useMemo(() => cardioTarget(history), [history]);
+  return (
+    <div className="rounded-2xl p-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+      <div className="mb-1">
+        <div className="font-semibold text-sm" style={{ color: C.plum }}>{phase.rounds} x {phase.workMin} min hard</div>
+        <Pill color={muscleColor("Cardio") + "22"} textColor={muscleColor("Cardio")}>{phase.label}</Pill>
+      </div>
+      <div className="text-xs mb-1" style={{ color: C.taupe }}>
+        {phase.restMin} min easy between. Target <strong style={{ color: C.plum }}>RPE {phase.rpe}</strong> — {phase.cue}
+      </div>
+      <div className="text-[11px] mb-3" style={{ color: C.taupe }}>
+        HR reference only: {target.label} ({target.source}). Trust RPE over the number.
+      </div>
+
+      <div className="grid grid-cols-[28px_1fr_1fr_1fr_32px] gap-2 text-[11px] uppercase tracking-wide mb-1.5 px-1" style={{ color: C.taupe }}>
+        <div>#</div><div>Previous</div><div>Peak bpm</div><div>RPE</div><div />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {exercise.sets.map((set, si) => {
+          const prev = prevSets && prevSets[si] ? prevSets[si] : null;
+          return (
+            <div key={si} className="grid grid-cols-[28px_1fr_1fr_1fr_32px] gap-2 items-center rounded-xl px-1 py-1.5"
+              style={{ background: set.completed ? C.sageLight : "transparent" }}>
+              <div className="text-sm font-medium text-center" style={{ color: set.completed ? C.sageDark : C.plum }}>{si + 1}</div>
+              <div className="text-xs" style={{ color: C.taupe }}>{prev ? `${prev.bpm || "—"}bpm @${prev.rpe || "—"}` : "—"}</div>
+              <input type="number" inputMode="numeric" value={set.bpm === "" ? "" : set.bpm}
+                onChange={(e) => onSetChange(exIndex, si, "bpm", e.target.value)} placeholder="—"
+                className="w-full rounded-lg px-2 py-1.5 text-sm text-center outline-none" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.plum }} />
+              <input type="number" inputMode="decimal" value={set.rpe === "" ? "" : set.rpe}
+                onChange={(e) => onSetChange(exIndex, si, "rpe", e.target.value)} placeholder="0"
+                className="w-full rounded-lg px-2 py-1.5 text-sm text-center outline-none" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.plum }} />
+              <button onClick={() => onToggleComplete(exIndex, si)} className="w-8 h-8 rounded-full flex items-center justify-center mx-auto"
+                style={{ background: set.completed ? C.sage : C.roseLighter, color: set.completed ? "#fff" : C.rose }} aria-label="Mark interval complete">
+                <IconCheck size={15} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <div className="text-[11px] mt-3" style={{ color: C.taupe }}>
+        Peak bpm is optional — RPE alone is enough to log the interval.
+      </div>
+    </div>
+  );
+}
+
 function ExerciseCard({ exercise, exIndex, history, onSetChange, onToggleComplete, onAddSet, onRemoveExercise }) {
   const prevSets = useMemo(() => getPreviousForExercise(history, exercise.name), [history, exercise.name]);
   return (
     <div className="rounded-2xl p-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
       <div className="flex items-center justify-between mb-3">
-        <div>
+        <div className="min-w-0 pr-2">
           <div className="font-semibold text-sm" style={{ color: C.plum }}>{exercise.name}</div>
-          <Pill color={muscleColor(exercise.muscle) + "22"} textColor={muscleColor(exercise.muscle)}>{exercise.muscle}</Pill>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Pill color={muscleColor(exercise.muscle) + "22"} textColor={muscleColor(exercise.muscle)}>{exercise.muscle}</Pill>
+            {exercise.targetReps && <Pill color={C.cardAlt} textColor={C.taupe}>{exercise.targetSets || exercise.sets.length} × {exercise.targetReps}</Pill>}
+            {exercise.rest && <Pill color={C.cardAlt} textColor={C.taupe}>rest {exercise.rest}</Pill>}
+          </div>
+          {exercise.note && <div className="text-[11px] mt-1.5 leading-snug" style={{ color: C.taupe }}>{exercise.note}</div>}
         </div>
         <button onClick={() => onRemoveExercise(exIndex)} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ color: C.taupe }} aria-label="Remove exercise">
           <IconX size={15} />
@@ -682,9 +866,9 @@ function WorkoutScreen({ activeWorkout, history, setActiveWorkout, onFinish, onD
           <div className="text-sm mt-1" style={{ color: C.taupe }}>Pick a day to start logging.</div>
         </div>
         <div className="w-full flex flex-col gap-2 mt-2">
-          {WORKOUT_PLAN.map((day) => (
+          {ALL_DAYS.map((day) => (
             <button key={day.id} onClick={() => onStartDay(day.id)} className="rounded-2xl px-4 py-3 text-sm font-medium"
-              style={{ background: C.card, border: `1px solid ${C.line}`, color: C.plum }}>{day.shortName}</button>
+              style={{ background: C.card, border: `1px solid ${C.line}`, color: day.kind === "cardio" ? muscleColor("Cardio") : C.plum }}>{day.shortName}</button>
           ))}
         </div>
       </div>
@@ -705,7 +889,9 @@ function WorkoutScreen({ activeWorkout, history, setActiveWorkout, onFinish, onD
     updateExercises((exs) => [...exs, { name, muscle: MUSCLE_MAP[name] || "Other", sets: [{ weight: "", reps: "", completed: false }, { weight: "", reps: "", completed: false }, { weight: "", reps: "", completed: false }] }]);
     setShowPicker(false);
   };
-  const planDay = WORKOUT_PLAN.find((d) => d.id === activeWorkout.dayId);
+  const planDay = findDay(activeWorkout.dayId);
+  const isCardio = planDay && planDay.kind === "cardio";
+  const phase = activeWorkout.phase || CARDIO_PHASES[0];
 
   return (
     <div className="px-4 pt-5 pb-4 flex flex-col gap-4">
@@ -722,17 +908,23 @@ function WorkoutScreen({ activeWorkout, history, setActiveWorkout, onFinish, onD
       {planDay && <ChecklistSection title="Warm-up" items={planDay.warmup} />}
 
       <div className="flex flex-col gap-3">
-        {activeWorkout.exercises.map((ex, i) => (
-          <ExerciseCard key={i} exercise={ex} exIndex={i} history={history} onSetChange={onSetChange} onToggleComplete={onToggleComplete} onAddSet={onAddSet} onRemoveExercise={onRemoveExercise} />
-        ))}
+        {activeWorkout.exercises.map((ex, i) =>
+          isCardio ? (
+            <CardioIntervalCard key={i} exercise={ex} exIndex={i} history={history} phase={phase} onSetChange={onSetChange} onToggleComplete={onToggleComplete} />
+          ) : (
+            <ExerciseCard key={i} exercise={ex} exIndex={i} history={history} onSetChange={onSetChange} onToggleComplete={onToggleComplete} onAddSet={onAddSet} onRemoveExercise={onRemoveExercise} />
+          )
+        )}
       </div>
 
-      <button onClick={() => setShowPicker((v) => !v)} className="rounded-2xl py-3 text-sm font-medium flex items-center justify-center gap-1.5" style={{ background: C.roseLighter, color: C.roseDark }}>
-        <IconPlus size={16} /> Add exercise
-        <IconChevronDown size={14} style={{ transform: showPicker ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
-      </button>
+      {!isCardio && (
+        <button onClick={() => setShowPicker((v) => !v)} className="rounded-2xl py-3 text-sm font-medium flex items-center justify-center gap-1.5" style={{ background: C.roseLighter, color: C.roseDark }}>
+          <IconPlus size={16} /> Add exercise
+          <IconChevronDown size={14} style={{ transform: showPicker ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
+        </button>
+      )}
 
-      {showPicker && (
+      {!isCardio && showPicker && (
         <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: C.cardAlt, border: `1px solid ${C.line}` }}>
           {Object.entries(EXTRA_EXERCISES).map(([muscle, list]) => (
             <div key={muscle}>
@@ -747,7 +939,7 @@ function WorkoutScreen({ activeWorkout, history, setActiveWorkout, onFinish, onD
         </div>
       )}
 
-      {planDay && <ChecklistSection title="Cooldown" items={planDay.cooldown} />}
+      {planDay && <ChecklistSection title={isCardio ? "Cooldown (5-10 min)" : "Cooldown & Stretching (10-15 min)"} items={planDay.cooldown} />}
 
       <div className="flex gap-3 mt-1">
         <button onClick={onDiscard} className="flex-1 rounded-2xl py-3 text-sm font-semibold" style={{ background: "transparent", border: `1.5px solid ${C.taupeLight}`, color: C.taupe }}>Discard</button>
@@ -763,7 +955,7 @@ function WorkoutScreen({ activeWorkout, history, setActiveWorkout, onFinish, onD
 
 function HistoryScreen({ history }) {
   const prFlagsBySession = useMemo(() => {
-    const sorted = [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const sorted = [...history].filter((s) => s.kind !== "cardio").sort((a, b) => new Date(a.date) - new Date(b.date));
     const running = {}, flags = {};
     sorted.forEach((session) => {
       flags[session.id] = {};
@@ -790,11 +982,15 @@ function HistoryScreen({ history }) {
             <div className="flex items-center justify-between mb-2">
               <div>
                 <div className="font-semibold text-sm" style={{ color: C.plum }}>{session.name}</div>
-                <div className="text-xs mt-0.5" style={{ color: C.taupe }}>{formatDate(session.date)} · {session.durationMin} min · {totalSets(session)} sets</div>
+                <div className="text-xs mt-0.5" style={{ color: C.taupe }}>{formatDate(session.date)} · {session.durationMin} min · {totalSets(session)} {session.kind === "cardio" ? "intervals" : "sets"}</div>
               </div>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {session.exercises.map((ex) => (
+              {session.kind === "cardio" ? (
+                <Pill color={muscleColor("Cardio") + "1F"} textColor={muscleColor("Cardio")}>
+                  {session.rounds || 4} × {session.workMin} min · avg RPE {avgRpe(session) ?? "—"}{peakBpm(session) ? ` · peak ${peakBpm(session)} bpm` : ""}
+                </Pill>
+              ) : session.exercises.map((ex) => (
                 <Pill key={ex.name} color={muscleColor(ex.muscle) + "1F"} textColor={muscleColor(ex.muscle)}>
                   {ex.name}{prFlags[ex.name] && <IconTrophy size={11} style={{ color: C.gold }} />}
                 </Pill>
@@ -811,11 +1007,56 @@ function HistoryScreen({ history }) {
 /* Progress screen                                                      */
 /* ------------------------------------------------------------------ */
 
+function CardioProgressCard({ history }) {
+  const sessions = useMemo(
+    () => cardioSessions(history).sort((a, b) => new Date(a.date) - new Date(b.date)),
+    [history]
+  );
+  const phase = cardioPhaseFor(history);
+  const target = cardioTarget(history);
+  const points = sessions.map((s) => ({ date: formatShortDate(s.date), weight: peakBpm(s) || 0 })).filter((p) => p.weight > 0);
+
+  return (
+    <div>
+      <h2 className="text-sm font-semibold mb-2" style={{ color: C.plum }}>Cardio</h2>
+      <div className="rounded-2xl p-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+        {sessions.length === 0 ? (
+          <div className="text-sm" style={{ color: C.taupe }}>
+            No interval sessions yet. Start with {CARDIO_PHASES[0].rounds} × {CARDIO_PHASES[0].workMin} min at RPE {CARDIO_PHASES[0].rpe}.
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-1">
+              <div>
+                <div className="text-sm font-semibold" style={{ color: C.plum }}>Peak heart rate</div>
+                <Pill color={muscleColor("Cardio") + "22"} textColor={muscleColor("Cardio")}>{phase.label}</Pill>
+              </div>
+              <div className="text-right">
+                <div className="text-xs" style={{ color: C.taupe }}>Sessions</div>
+                <div className="text-base font-semibold" style={{ color: C.rose }}>{sessions.length}</div>
+              </div>
+            </div>
+            {points.length > 0 ? <SparklineChart points={points} /> : (
+              <div className="text-xs py-2" style={{ color: C.taupe }}>No heart rate recorded yet — RPE only.</div>
+            )}
+            <div className="text-[11px] mt-2" style={{ color: C.taupe }}>
+              Target: {target.label} ({target.source}).
+              {target.kind === "estimate"
+                ? " After three sessions this switches from the age formula to your own recorded peak."
+                : " Your recorded peak is already a near-max effort, so it is a mark to beat rather than a band to sit inside."}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ProgressScreen({ history }) {
   const weekStart = startOfWeek(new Date());
   const volumeData = useMemo(() => {
     const totals = {};
-    history.filter((s) => new Date(s.date) >= weekStart).forEach((s) =>
+    history.filter((s) => new Date(s.date) >= weekStart && s.kind !== "cardio").forEach((s) =>
       s.exercises.forEach((ex) => {
         const vol = ex.sets.reduce((sum, st) => sum + (st.completed ? (Number(st.weight) || 0) * (Number(st.reps) || 0) : 0), 0);
         totals[ex.muscle] = (totals[ex.muscle] || 0) + vol;
@@ -826,7 +1067,8 @@ function ProgressScreen({ history }) {
 
   const exerciseNames = useMemo(() => {
     const seen = new Map();
-    [...history].sort((a, b) => new Date(b.date) - new Date(a.date)).forEach((s) => s.exercises.forEach((ex) => seen.set(ex.name, true)));
+    [...history].filter((s) => s.kind !== "cardio").sort((a, b) => new Date(b.date) - new Date(a.date))
+      .forEach((s) => s.exercises.forEach((ex) => seen.set(ex.name, true)));
     return Array.from(seen.keys()).slice(0, 8);
   }, [history]);
 
@@ -840,6 +1082,7 @@ function ProgressScreen({ history }) {
           {volumeData.length === 0 ? <div className="text-sm" style={{ color: C.taupe }}>No sets logged yet this week.</div> : <VolumeBarChart data={volumeData} />}
         </div>
       </div>
+      <CardioProgressCard history={history} />
       <div>
         <h2 className="text-sm font-semibold mb-2" style={{ color: C.plum }}>Strength trends</h2>
         <div className="flex flex-col gap-3">
@@ -911,27 +1154,47 @@ function FitnessTracker() {
   useEffect(() => saveJSON(ACTIVE_KEY, activeWorkout), [activeWorkout]);
 
   const startDay = (dayId) => {
-    const plan = WORKOUT_PLAN.find((d) => d.id === dayId);
+    const plan = findDay(dayId);
+    if (plan.kind === "cardio") {
+      const phase = cardioPhaseFor(history);
+      setActiveWorkout({
+        id: uid(), dayId, kind: "cardio", name: plan.name, startedAt: new Date().toISOString(),
+        phase, workMin: phase.workMin, rounds: phase.rounds,
+        exercises: [{ name: CARDIO_EXERCISE, muscle: "Cardio", sets: Array.from({ length: phase.rounds }, () => ({ bpm: "", rpe: "", completed: false })) }],
+      });
+      setScreen("workout");
+      return;
+    }
     setActiveWorkout({
       id: uid(), dayId, name: plan.name, startedAt: new Date().toISOString(),
-      exercises: plan.exercises.map((e) => ({ name: e.name, muscle: e.muscle, sets: Array.from({ length: e.targetSets }, () => ({ weight: "", reps: "", completed: false })) })),
+      exercises: plan.exercises.map((e) => ({
+        name: e.name, muscle: e.muscle, targetSets: e.targetSets, targetReps: e.targetReps, rest: e.rest, note: e.note,
+        sets: Array.from({ length: e.targetSets }, () => ({ weight: "", reps: "", completed: false })),
+      })),
     });
     setScreen("workout");
   };
 
   const finishWorkout = (elapsedSeconds) => {
-    const plan = WORKOUT_PLAN.find((d) => d.id === activeWorkout.dayId);
+    // A workout may have been started under an older plan version, so the day may no
+    // longer exist. Fall back to the stored name rather than crashing on Finish.
+    const plan = findDay(activeWorkout.dayId) || { shortName: activeWorkout.name || "Workout", kind: activeWorkout.kind };
+    const isCardio = plan.kind === "cardio";
     const cleanExercises = activeWorkout.exercises
-      .map((ex) => ({ ...ex, sets: ex.sets.filter((s) => s.completed && s.weight !== "" && s.reps !== "") }))
+      .map((ex) => ({
+        ...ex,
+        sets: ex.sets.filter((s) => (isCardio ? s.completed && s.rpe !== "" : s.completed && s.weight !== "" && s.reps !== "")),
+      }))
       .filter((ex) => ex.sets.length > 0);
 
     if (cleanExercises.length === 0) {
-      if (!window.confirm("No completed sets were logged. Discard this workout?")) return;
+      if (!window.confirm(isCardio ? "No completed intervals were logged. Discard this session?" : "No completed sets were logged. Discard this workout?")) return;
       setActiveWorkout(null); setScreen("dashboard"); return;
     }
     const session = {
-      id: uid(), dayId: activeWorkout.dayId, name: plan.shortName.replace(/^Day \d: /, ""),
+      id: uid(), dayId: activeWorkout.dayId, name: plan.shortName.replace(/^Day \d: /, "").replace(/^Cardio: /, ""),
       date: activeWorkout.startedAt, durationMin: Math.max(1, Math.round(elapsedSeconds / 60)), exercises: cleanExercises,
+      ...(isCardio ? { kind: "cardio", phase: activeWorkout.phase?.label, workMin: activeWorkout.workMin, rounds: activeWorkout.rounds } : {}),
     };
     setHistory((h) => [...h, session]);
     setActiveWorkout(null);

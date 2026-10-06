@@ -35,6 +35,7 @@ const { useState, useEffect, useMemo, useRef } = React;
 
 const HISTORY_KEY = "fitness-tracker:history:v1";
 const ACTIVE_KEY = "fitness-tracker:active:v1";
+const REST_KEY = "fitness-tracker:rest:v1";
 
 function loadJSON(key, fallback) {
   try {
@@ -47,6 +48,51 @@ function saveJSON(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch (e) {}
+}
+
+/* ------------------------------------------------------------------ */
+/* Rest timer                                                          */
+/* ------------------------------------------------------------------ */
+
+// Plan rest values are "m:ss" ("2:00", "1:30", "0:60"). Anything unparseable
+// (custom exercises added mid-session) falls back to the caller's default.
+function parseRest(str) {
+  const m = String(str || "").match(/^(\d+):(\d+)$/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : 0;
+}
+function fmtClock(seconds) {
+  const s = Math.abs(Math.round(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+// iOS Safari only allows audio that was unlocked inside a user gesture, so the
+// context is created on the tap that starts the timer, not when it expires.
+let audioCtx = null;
+function primeAudio() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  } catch (e) {}
+}
+function beep() {
+  try {
+    primeAudio();
+    if (!audioCtx) return;
+    const t0 = audioCtx.currentTime;
+    [0, 0.18].forEach((offset) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, t0 + offset);
+      gain.gain.exponentialRampToValueAtTime(0.3, t0 + offset + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + offset + 0.16);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(t0 + offset);
+      osc.stop(t0 + offset + 0.17);
+    });
+  } catch (e) {}
+  try { if (navigator.vibrate) navigator.vibrate([120, 60, 120]); } catch (e) {}
 }
 
 /* ------------------------------------------------------------------ */
@@ -103,6 +149,7 @@ const IconPlus = (p) => <Icon {...p}><path d="M12 5v14M5 12h14" /></Icon>;
 const IconCheck = (p) => <Icon {...p}><path d="M20 6L9 17l-5-5" /></Icon>;
 const IconX = (p) => <Icon {...p}><path d="M18 6L6 18M6 6l12 12" /></Icon>;
 const IconTimer = (p) => <Icon {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></Icon>;
+const IconMinus = (p) => <Icon {...p}><path d="M5 12h14" /></Icon>;
 const IconChevronRight = (p) => <Icon {...p}><path d="M9 6l6 6-6 6" /></Icon>;
 const IconChevronDown = (p) => <Icon {...p}><path d="M6 9l6 6 6-6" /></Icon>;
 const IconDownload = (p) => <Icon {...p}><path d="M12 3v12M7 11l5 5 5-5" /><path d="M4 19h16" /></Icon>;
@@ -142,13 +189,13 @@ const WORKOUT_PLAN = [
     warmup: ["5 min easy bike — finish around 120 bpm", "Bodyweight squats x15", "Hip circles x10 each way", "Cat-cow x10", "Ramp the squat: 2 build-up sets, then work"],
     cooldown: ["Quad stretch, 45s x2/side", "Hip flexor stretch, 45s x2/side", "Glute stretch, 45s x2/side", "Calf stretch, 30s/side"],
     exercises: [
-      { name: "Back Squat", muscle: "Quads", targetSets: 4, targetReps: "6-8", rest: "2:00" },
+      { name: "Back Squat", muscle: "Quads", targetSets: 4, targetReps: "6-8", rest: "2:00", note: "Set the rack safeties just below your bottom position - a failed rep then means sitting the bar down, not getting stuck. Thigh past parallel; depth matters more than load." },
       { name: "Hip Thrust", muscle: "Glutes", targetSets: 3, targetReps: "10", rest: "2:00", note: "2nd weekly exposure — lighter than Day 1." },
       { name: "Leg Press", muscle: "Quads", targetSets: 3, targetReps: "10-12", rest: "2:00", note: "Feet higher = more glute/hamstring." },
       { name: "Back Extension", muscle: "Glutes", targetSets: 3, targetReps: "12", rest: "1:30", note: "Round the upper back slightly so glutes work, not lower back." },
-      { name: "Glute Kickback Machine", muscle: "Glutes", targetSets: 3, targetReps: "12/leg", rest: "0:60", note: "If the machine allows, angle the leg out 30-45 degrees rather than straight back. Superset with abduction." },
+      { name: "Cable Kickback", muscle: "Glutes", targetSets: 3, targetReps: "12/leg", rest: "0:60", note: "Pelvis square, no arching the lower back. Load reads low with correct technique - that is right, not weaker. Superset with abduction." },
       { name: "Cable Hip Abduction", muscle: "Glutes", targetSets: 3, targetReps: "15", rest: "0:60" },
-      { name: "Seated Calf Raise", muscle: "Calves", targetSets: 2, targetReps: "15", rest: "0:60", note: "Knee bent — soleus. A different muscle from the standing version." },
+      { name: "Seated Calf Raise", muscle: "Calves", targetSets: 2, targetReps: "15", rest: "0:60", note: "No machine needed: sit on a bench, toes on a plate, padded DB resting on your knees. Bent knee = soleus, a different muscle from the standing version." },
     ] },
   { id: "day4", shortName: "Day 4: Upper B (Pull + Core)", name: "Upper B", focus: "Back, Chest, Shoulders, Core",
     warmup: ["5 min row", "Arm circles x20 each way", "Band pull-aparts x15", "Scapular pull-ups or dead hangs x5"],
@@ -177,6 +224,8 @@ const LEGACY_MUSCLE_MAP = {
   "Leg Extension": "Quads", "Plank": "Core", "Russian Twist": "Core", "Rear Delt Fly": "Rear Delts",
   "Seated Cable Row": "Back", "Cable Crunch": "Core", "Hanging Leg Raise": "Core",
   "Cable Kickback": "Glutes", "Lying Leg Curl": "Hamstrings",
+  // Dropped 05.10.2026 - her Boston gym has no such machine. Logged on 02.09.2026.
+  "Glute Kickback Machine": "Glutes",
 };
 Object.entries(LEGACY_MUSCLE_MAP).forEach(([n, m]) => { if (!MUSCLE_MAP[n]) MUSCLE_MAP[n] = m; });
 
@@ -772,7 +821,7 @@ function CardioIntervalCard({ exercise, exIndex, history, phase, onSetChange, on
   );
 }
 
-function ExerciseCard({ exercise, exIndex, history, onSetChange, onToggleComplete, onAddSet, onRemoveExercise }) {
+function ExerciseCard({ exercise, exIndex, history, onSetChange, onToggleComplete, onAddSet, onRemoveExercise, onStartRest }) {
   const prevSets = useMemo(() => getPreviousForExercise(history, exercise.name), [history, exercise.name]);
   return (
     <div className="rounded-2xl p-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
@@ -807,7 +856,13 @@ function ExerciseCard({ exercise, exIndex, history, onSetChange, onToggleComplet
               <input type="number" inputMode="numeric" value={set.reps === "" ? "" : set.reps}
                 onChange={(e) => onSetChange(exIndex, si, "reps", e.target.value)} placeholder="0"
                 className="w-full rounded-lg px-2 py-1.5 text-sm text-center outline-none" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.plum }} />
-              <button onClick={() => onToggleComplete(exIndex, si)} className="w-8 h-8 rounded-full flex items-center justify-center mx-auto"
+              <button
+                onClick={() => {
+                  onToggleComplete(exIndex, si);
+                  // Only on completing a set — unchecking a mistake should not start a rest.
+                  if (!set.completed) onStartRest(exercise.name, parseRest(exercise.rest) || 90);
+                }}
+                className="w-8 h-8 rounded-full flex items-center justify-center mx-auto"
                 style={{ background: set.completed ? C.sage : C.roseLighter, color: set.completed ? "#fff" : C.rose }} aria-label="Mark set complete">
                 <IconCheck size={15} />
               </button>
@@ -843,7 +898,7 @@ function ChecklistSection({ title, items }) {
   );
 }
 
-function WorkoutScreen({ activeWorkout, history, setActiveWorkout, onFinish, onDiscard, onStartDay }) {
+function WorkoutScreen({ activeWorkout, history, setActiveWorkout, onFinish, onDiscard, onStartDay, onStartRest }) {
   const [elapsed, setElapsed] = useState(0);
   const [showPicker, setShowPicker] = useState(false);
   const startRef = useRef(null);
@@ -912,7 +967,7 @@ function WorkoutScreen({ activeWorkout, history, setActiveWorkout, onFinish, onD
           isCardio ? (
             <CardioIntervalCard key={i} exercise={ex} exIndex={i} history={history} phase={phase} onSetChange={onSetChange} onToggleComplete={onToggleComplete} />
           ) : (
-            <ExerciseCard key={i} exercise={ex} exIndex={i} history={history} onSetChange={onSetChange} onToggleComplete={onToggleComplete} onAddSet={onAddSet} onRemoveExercise={onRemoveExercise} />
+            <ExerciseCard key={i} exercise={ex} exIndex={i} history={history} onSetChange={onSetChange} onToggleComplete={onToggleComplete} onAddSet={onAddSet} onRemoveExercise={onRemoveExercise} onStartRest={onStartRest} />
           )
         )}
       </div>
@@ -1118,6 +1173,93 @@ function ProgressScreen({ history }) {
 /* Bottom nav                                                           */
 /* ------------------------------------------------------------------ */
 
+function RestTimerBar({ rest, onAdjust, onDismiss }) {
+  const [now, setNow] = useState(() => Date.now());
+  const firedRef = useRef(false);
+
+  useEffect(() => {
+    if (!rest) return;
+    // A timer restored from localStorage may already have expired while the app
+    // was closed — show it, but do not beep retroactively.
+    firedRef.current = Date.now() >= rest.endsAt;
+    // `id` is declared before tick() runs: the first call is synchronous, and a
+    // timer restored from storage can already be past the stop threshold.
+    let id = null;
+    const tick = () => {
+      const t = Date.now();
+      setNow(t);
+      if (!firedRef.current && t >= rest.endsAt) { firedRef.current = true; beep(); }
+      // Stop spinning on a timer that was left running and forgotten.
+      if (t - rest.endsAt > 10 * 60 * 1000 && id !== null) clearInterval(id);
+    };
+    tick();
+    id = setInterval(tick, 250);
+    return () => clearInterval(id);
+  }, [rest && rest.endsAt]);
+
+  // Hold the screen awake only while counting down, so the phone does not lock
+  // and swallow the beep. iOS drops the lock on backgrounding, hence the
+  // visibilitychange re-request.
+  useEffect(() => {
+    if (!rest || Date.now() >= rest.endsAt) return;
+    let sentinel = null, cancelled = false;
+    const acquire = async () => {
+      try {
+        if (!navigator.wakeLock || document.visibilityState !== "visible") return;
+        sentinel = await navigator.wakeLock.request("screen");
+        if (cancelled) { sentinel.release(); sentinel = null; }
+      } catch (e) {}
+    };
+    const onVis = () => { if (document.visibilityState === "visible" && Date.now() < rest.endsAt) acquire(); };
+    acquire();
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVis);
+      try { if (sentinel) sentinel.release(); } catch (e) {}
+    };
+  }, [rest && rest.endsAt]);
+
+  if (!rest) return null;
+
+  const remaining = (rest.endsAt - now) / 1000;
+  const over = remaining <= 0;
+  const pct = Math.max(0, Math.min(1, 1 - remaining / rest.total));
+  const fg = over ? C.roseDark : C.sageDark;
+
+  return (
+    <div className="px-3 pt-2" style={{ background: C.card, borderTop: `1px solid ${C.line}` }}>
+      <div className="rounded-2xl px-3 py-2.5" style={{ background: over ? C.roseLighter : C.sageLight }}>
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] uppercase tracking-wide truncate" style={{ color: fg, opacity: 0.8 }}>
+              {over ? "Over rest" : "Rest"} · {rest.name}
+            </div>
+            <div className="text-2xl font-semibold tabular-nums leading-tight" style={{ color: fg, fontFamily: "Fraunces, serif" }}>
+              {over ? "+" : ""}{fmtClock(remaining)}
+            </div>
+          </div>
+          <button onClick={() => onAdjust(-15)} className="w-9 h-9 rounded-full flex items-center justify-center"
+            style={{ background: "#fff", color: fg }} aria-label="Take 15 seconds off the rest">
+            <IconMinus size={15} />
+          </button>
+          <button onClick={() => onAdjust(15)} className="w-9 h-9 rounded-full flex items-center justify-center"
+            style={{ background: "#fff", color: fg }} aria-label="Add 15 seconds to the rest">
+            <IconPlus size={15} />
+          </button>
+          <button onClick={onDismiss} className="w-9 h-9 rounded-full flex items-center justify-center"
+            style={{ background: over ? C.rose : C.sage, color: "#fff" }} aria-label="Skip rest">
+            <IconCheck size={15} />
+          </button>
+        </div>
+        <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: "#FFFFFF99" }}>
+          <div className="h-full rounded-full" style={{ width: `${pct * 100}%`, background: over ? C.rose : C.sage, transition: "width 0.25s linear" }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BottomNav({ screen, setScreen, hasActiveWorkout }) {
   const items = [
     { id: "dashboard", label: "Dashboard", Icon: IconHome },
@@ -1149,9 +1291,21 @@ function FitnessTracker() {
   const [history, setHistory] = useState(() => loadJSON(HISTORY_KEY, null) || []);
   const [activeWorkout, setActiveWorkout] = useState(() => loadJSON(ACTIVE_KEY, null));
   const [screen, setScreen] = useState("dashboard");
+  // Rest lives here rather than in WorkoutScreen so it keeps running while she
+  // is on another tab, and survives Safari reloading the page mid-set.
+  const [rest, setRest] = useState(() => loadJSON(REST_KEY, null));
 
   useEffect(() => saveJSON(HISTORY_KEY, history), [history]);
   useEffect(() => saveJSON(ACTIVE_KEY, activeWorkout), [activeWorkout]);
+  useEffect(() => saveJSON(REST_KEY, rest), [rest]);
+
+  const startRest = (name, seconds) => {
+    primeAudio();
+    setRest({ name, total: seconds, endsAt: Date.now() + seconds * 1000 });
+  };
+  const adjustRest = (delta) =>
+    setRest((r) => (r ? { ...r, total: Math.max(15, r.total + delta), endsAt: r.endsAt + delta * 1000 } : r));
+  const dismissRest = () => setRest(null);
 
   const startDay = (dayId) => {
     const plan = findDay(dayId);
@@ -1198,11 +1352,12 @@ function FitnessTracker() {
     };
     setHistory((h) => [...h, session]);
     setActiveWorkout(null);
+    setRest(null);
     setScreen("history");
   };
 
   const discardWorkout = () => {
-    if (window.confirm("Discard this workout? Your logged sets will be lost.")) { setActiveWorkout(null); setScreen("dashboard"); }
+    if (window.confirm("Discard this workout? Your logged sets will be lost.")) { setActiveWorkout(null); setRest(null); setScreen("dashboard"); }
   };
 
   const clearAllData = () => {
@@ -1230,11 +1385,16 @@ function FitnessTracker() {
             onReset={clearAllData}
           />
         )}
-        {screen === "workout" && <WorkoutScreen activeWorkout={activeWorkout} history={history.filter((h) => !activeWorkout || h.id !== activeWorkout.id)} setActiveWorkout={setActiveWorkout} onFinish={finishWorkout} onDiscard={discardWorkout} onStartDay={startDay} />}
+        {screen === "workout" && <WorkoutScreen activeWorkout={activeWorkout} history={history.filter((h) => !activeWorkout || h.id !== activeWorkout.id)} setActiveWorkout={setActiveWorkout} onFinish={finishWorkout} onDiscard={discardWorkout} onStartDay={startDay} onStartRest={startRest} />}
         {screen === "history" && <HistoryScreen history={history} />}
         {screen === "progress" && <ProgressScreen history={history} />}
       </div>
-      <BottomNav screen={screen} setScreen={setScreen} hasActiveWorkout={!!activeWorkout} />
+      {/* One sticky cluster: the page itself scrolls, so an unsticky rest bar
+          would scroll off the bottom of a long workout. */}
+      <div className="sticky bottom-0" style={{ zIndex: 20 }}>
+        <RestTimerBar rest={rest} onAdjust={adjustRest} onDismiss={dismissRest} />
+        <BottomNav screen={screen} setScreen={setScreen} hasActiveWorkout={!!activeWorkout} />
+      </div>
     </div>
   );
 }

@@ -36,6 +36,7 @@ const { useState, useEffect, useMemo, useRef } = React;
 const HISTORY_KEY = "fitness-tracker:history:v1";
 const ACTIVE_KEY = "fitness-tracker:active:v1";
 const REST_KEY = "fitness-tracker:rest:v1";
+const UNIT_KEY = "fitness-tracker:unit:v1";
 
 function loadJSON(key, fallback) {
   try {
@@ -388,6 +389,33 @@ function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+// History is always stored in kg, so sessions logged before the switch stay
+// comparable and the exports read the same. The unit only changes what she
+// types and sees — US gyms label plates and stacks in lb.
+const LB_PER_KG = 2.20462;
+function kgToUnit(kg, unit) {
+  return unit === "lb" ? kg * LB_PER_KG : kg;
+}
+function unitToKg(value, unit) {
+  // Three decimals so 25 lb comes back as 25 lb, not 24.9.
+  return Math.round((unit === "lb" ? value / LB_PER_KG : value) * 1000) / 1000;
+}
+function fmtWeight(kg, unit) {
+  return String(Math.round(kgToUnit(Number(kg) || 0, unit) * 10) / 10);
+}
+
+function UnitToggle({ unit, setUnit }) {
+  return (
+    <div className="inline-flex rounded-full p-0.5" style={{ background: C.cardAlt, border: `1px solid ${C.line}` }}>
+      {["kg", "lb"].map((u) => (
+        <button key={u} onClick={() => setUnit(u)} className="px-2.5 py-1 rounded-full text-xs font-semibold"
+          style={{ background: unit === u ? C.rose : "transparent", color: unit === u ? "#fff" : C.taupe }}
+          aria-pressed={unit === u}>{u}</button>
+      ))}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Export / import                                                     */
 /* ------------------------------------------------------------------ */
@@ -627,7 +655,7 @@ function WeeklySummaryCard({ history }) {
 /* Chart.js wrappers                                                   */
 /* ------------------------------------------------------------------ */
 
-function VolumeBarChart({ data }) {
+function VolumeBarChart({ data, unit }) {
   const canvasRef = useRef(null);
   const chartRef = useRef(null);
   useEffect(() => {
@@ -643,7 +671,7 @@ function VolumeBarChart({ data }) {
         indexAxis: "y",
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.x} kg total volume` } } },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.x} ${unit} total volume` } } },
         scales: {
           x: { grid: { color: C.line }, ticks: { color: C.taupe, font: { size: 11 } } },
           y: { grid: { display: false }, ticks: { color: C.plum, font: { size: 12 } } },
@@ -651,7 +679,7 @@ function VolumeBarChart({ data }) {
       },
     });
     return () => chartRef.current && chartRef.current.destroy();
-  }, [JSON.stringify(data)]);
+  }, [JSON.stringify(data), unit]);
   return <div style={{ width: "100%", height: Math.max(160, data.length * 44) }}><canvas ref={canvasRef}></canvas></div>;
 }
 
@@ -683,7 +711,7 @@ function SparklineChart({ points }) {
 /* Dashboard                                                            */
 /* ------------------------------------------------------------------ */
 
-function Dashboard({ history, onStartDay, onImport, onReset }) {
+function Dashboard({ history, unit, setUnit, onStartDay, onImport, onReset }) {
   const streak = computeStreak(history);
   const thisWeek = computeThisWeekCount(history);
   const cardioWeek = computeCardioThisWeek(history);
@@ -695,7 +723,7 @@ function Dashboard({ history, onStartDay, onImport, onReset }) {
     <div className="px-4 pt-5 pb-4 flex flex-col gap-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold" style={{ color: C.plum, fontFamily: "Fraunces, serif" }}>My Fitness Journey</h1>
-        <Pill color={C.sageLight} textColor={C.sageDark}>4-month program</Pill>
+        <UnitToggle unit={unit} setUnit={setUnit} />
       </div>
 
       <div className="flex gap-3">
@@ -756,7 +784,7 @@ function Dashboard({ history, onStartDay, onImport, onReset }) {
                 <div className="text-xs" style={{ color: C.taupe }}>{formatShortDate(pr.date)}</div>
               </div>
               <div className="text-right">
-                <div className="text-sm font-semibold" style={{ color: C.rose }}>{pr.weight} kg</div>
+                <div className="text-sm font-semibold" style={{ color: C.rose }}>{fmtWeight(pr.weight, unit)} {unit}</div>
                 <div className="text-xs" style={{ color: C.taupe }}>x{pr.reps}</div>
               </div>
             </div>
@@ -821,7 +849,7 @@ function CardioIntervalCard({ exercise, exIndex, history, phase, onSetChange, on
   );
 }
 
-function ExerciseCard({ exercise, exIndex, history, onSetChange, onToggleComplete, onAddSet, onRemoveExercise, onStartRest }) {
+function ExerciseCard({ exercise, exIndex, history, unit, onSetChange, onWeightChange, onToggleComplete, onAddSet, onRemoveExercise, onStartRest }) {
   const prevSets = useMemo(() => getPreviousForExercise(history, exercise.name), [history, exercise.name]);
   return (
     <div className="rounded-2xl p-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
@@ -840,18 +868,21 @@ function ExerciseCard({ exercise, exIndex, history, onSetChange, onToggleComplet
         </button>
       </div>
       <div className="grid grid-cols-[28px_1fr_1fr_1fr_32px] gap-2 text-[11px] uppercase tracking-wide mb-1.5 px-1" style={{ color: C.taupe }}>
-        <div>Set</div><div>Previous</div><div>Weight kg</div><div>Reps</div><div />
+        <div>Set</div><div>Previous</div><div>Weight {unit}</div><div>Reps</div><div />
       </div>
       <div className="flex flex-col gap-1.5">
         {exercise.sets.map((set, si) => {
           const prev = prevSets && prevSets[si] ? prevSets[si] : null;
+          // Show exactly what she typed while she is still in that unit, so a
+          // half-typed "12." is not rewritten under her finger by the conversion.
+          const shown = set.weight === "" ? "" : set.entryUnit === unit && set.entry !== undefined ? set.entry : fmtWeight(set.weight, unit);
           return (
             <div key={si} className="grid grid-cols-[28px_1fr_1fr_1fr_32px] gap-2 items-center rounded-xl px-1 py-1.5"
               style={{ background: set.completed ? C.sageLight : "transparent" }}>
               <div className="text-sm font-medium text-center" style={{ color: set.completed ? C.sageDark : C.plum }}>{si + 1}</div>
-              <div className="text-xs" style={{ color: C.taupe }}>{prev ? `${prev.weight}kg x${prev.reps}` : "—"}</div>
-              <input type="number" inputMode="decimal" value={set.weight === "" ? "" : set.weight}
-                onChange={(e) => onSetChange(exIndex, si, "weight", e.target.value)} placeholder="0"
+              <div className="text-xs" style={{ color: C.taupe }}>{prev ? `${fmtWeight(prev.weight, unit)}${unit} x${prev.reps}` : "—"}</div>
+              <input type="number" inputMode="decimal" value={shown}
+                onChange={(e) => onWeightChange(exIndex, si, e.target.value)} placeholder="0"
                 className="w-full rounded-lg px-2 py-1.5 text-sm text-center outline-none" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.plum }} />
               <input type="number" inputMode="numeric" value={set.reps === "" ? "" : set.reps}
                 onChange={(e) => onSetChange(exIndex, si, "reps", e.target.value)} placeholder="0"
@@ -898,7 +929,7 @@ function ChecklistSection({ title, items }) {
   );
 }
 
-function WorkoutScreen({ activeWorkout, history, setActiveWorkout, onFinish, onDiscard, onStartDay, onStartRest }) {
+function WorkoutScreen({ activeWorkout, history, unit, setUnit, setActiveWorkout, onFinish, onDiscard, onStartDay, onStartRest }) {
   const [elapsed, setElapsed] = useState(0);
   const [showPicker, setShowPicker] = useState(false);
   const startRef = useRef(null);
@@ -935,6 +966,9 @@ function WorkoutScreen({ activeWorkout, history, setActiveWorkout, onFinish, onD
   const updateExercises = (fn) => setActiveWorkout((w) => ({ ...w, exercises: fn(w.exercises) }));
   const onSetChange = (exIndex, setIndex, field, value) =>
     updateExercises((exs) => exs.map((ex, i) => i !== exIndex ? ex : { ...ex, sets: ex.sets.map((s, si) => si !== setIndex ? s : { ...s, [field]: value === "" ? "" : Number(value) }) }));
+  const onWeightChange = (exIndex, setIndex, raw) =>
+    updateExercises((exs) => exs.map((ex, i) => i !== exIndex ? ex : { ...ex, sets: ex.sets.map((s, si) => si !== setIndex ? s :
+      { ...s, weight: raw === "" ? "" : unitToKg(Number(raw), unit), entry: raw, entryUnit: unit }) }));
   const onToggleComplete = (exIndex, setIndex) =>
     updateExercises((exs) => exs.map((ex, i) => i !== exIndex ? ex : { ...ex, sets: ex.sets.map((s, si) => si !== setIndex ? s : { ...s, completed: !s.completed }) }));
   const onAddSet = (exIndex) =>
@@ -955,8 +989,11 @@ function WorkoutScreen({ activeWorkout, history, setActiveWorkout, onFinish, onD
           <div className="text-xs" style={{ color: C.taupe }}>{formatDate(activeWorkout.startedAt)}</div>
           <h1 className="text-xl font-semibold" style={{ color: C.plum, fontFamily: "Fraunces, serif" }}>{activeWorkout.name}</h1>
         </div>
-        <div className="flex items-center gap-1.5 rounded-full px-3 py-1.5" style={{ background: C.plum, color: "#fff" }}>
-          <IconTimer size={14} /><span className="text-sm font-medium tabular-nums">{mins}:{secs}</span>
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex items-center gap-1.5 rounded-full px-3 py-1.5" style={{ background: C.plum, color: "#fff" }}>
+            <IconTimer size={14} /><span className="text-sm font-medium tabular-nums">{mins}:{secs}</span>
+          </div>
+          {!isCardio && <UnitToggle unit={unit} setUnit={setUnit} />}
         </div>
       </div>
 
@@ -967,7 +1004,7 @@ function WorkoutScreen({ activeWorkout, history, setActiveWorkout, onFinish, onD
           isCardio ? (
             <CardioIntervalCard key={i} exercise={ex} exIndex={i} history={history} phase={phase} onSetChange={onSetChange} onToggleComplete={onToggleComplete} />
           ) : (
-            <ExerciseCard key={i} exercise={ex} exIndex={i} history={history} onSetChange={onSetChange} onToggleComplete={onToggleComplete} onAddSet={onAddSet} onRemoveExercise={onRemoveExercise} onStartRest={onStartRest} />
+            <ExerciseCard key={i} exercise={ex} exIndex={i} history={history} unit={unit} onSetChange={onSetChange} onWeightChange={onWeightChange} onToggleComplete={onToggleComplete} onAddSet={onAddSet} onRemoveExercise={onRemoveExercise} onStartRest={onStartRest} />
           )
         )}
       </div>
@@ -1107,7 +1144,7 @@ function CardioProgressCard({ history }) {
   );
 }
 
-function ProgressScreen({ history }) {
+function ProgressScreen({ history, unit }) {
   const weekStart = startOfWeek(new Date());
   const volumeData = useMemo(() => {
     const totals = {};
@@ -1117,8 +1154,8 @@ function ProgressScreen({ history }) {
         totals[ex.muscle] = (totals[ex.muscle] || 0) + vol;
       })
     );
-    return Object.entries(totals).map(([muscle, volume]) => ({ muscle, volume: Math.round(volume) })).sort((a, b) => b.volume - a.volume);
-  }, [history]);
+    return Object.entries(totals).map(([muscle, volume]) => ({ muscle, volume: Math.round(kgToUnit(volume, unit)) })).sort((a, b) => b.volume - a.volume);
+  }, [history, unit]);
 
   const exerciseNames = useMemo(() => {
     const seen = new Map();
@@ -1134,7 +1171,7 @@ function ProgressScreen({ history }) {
       <div>
         <h2 className="text-sm font-semibold mb-2" style={{ color: C.plum }}>Weekly volume by muscle group</h2>
         <div className="rounded-2xl p-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
-          {volumeData.length === 0 ? <div className="text-sm" style={{ color: C.taupe }}>No sets logged yet this week.</div> : <VolumeBarChart data={volumeData} />}
+          {volumeData.length === 0 ? <div className="text-sm" style={{ color: C.taupe }}>No sets logged yet this week.</div> : <VolumeBarChart data={volumeData} unit={unit} />}
         </div>
       </div>
       <CardioProgressCard history={history} />
@@ -1143,7 +1180,7 @@ function ProgressScreen({ history }) {
         <div className="flex flex-col gap-3">
           {exerciseNames.map((name) => {
             const points = history.filter((s) => s.exercises.some((e) => e.name === name)).sort((a, b) => new Date(a.date) - new Date(b.date))
-              .map((s) => { const ex = s.exercises.find((e) => e.name === name); const b = bestSet(ex.sets); return { date: formatShortDate(s.date), weight: b ? b.weight : 0, reps: b ? b.reps : 0 }; });
+              .map((s) => { const ex = s.exercises.find((e) => e.name === name); const b = bestSet(ex.sets); return { date: formatShortDate(s.date), weight: b ? Number(fmtWeight(b.weight, unit)) : 0, reps: b ? b.reps : 0 }; });
             if (points.length === 0) return null;
             const pr = points.reduce((best, p) => (p.weight > (best?.weight ?? -1) ? p : best), null);
             const muscle = MUSCLE_MAP[name] || "Other";
@@ -1156,7 +1193,7 @@ function ProgressScreen({ history }) {
                   </div>
                   <div className="text-right">
                     <div className="text-xs" style={{ color: C.taupe }}>Current PR</div>
-                    <div className="text-base font-semibold" style={{ color: C.rose }}>{pr.weight} kg x{pr.reps}</div>
+                    <div className="text-base font-semibold" style={{ color: C.rose }}>{pr.weight} {unit} x{pr.reps}</div>
                   </div>
                 </div>
                 <SparklineChart points={points} />
@@ -1294,7 +1331,9 @@ function FitnessTracker() {
   // Rest lives here rather than in WorkoutScreen so it keeps running while she
   // is on another tab, and survives Safari reloading the page mid-set.
   const [rest, setRest] = useState(() => loadJSON(REST_KEY, null));
+  const [unit, setUnit] = useState(() => loadJSON(UNIT_KEY, "kg"));
 
+  useEffect(() => saveJSON(UNIT_KEY, unit), [unit]);
   useEffect(() => saveJSON(HISTORY_KEY, history), [history]);
   useEffect(() => saveJSON(ACTIVE_KEY, activeWorkout), [activeWorkout]);
   useEffect(() => saveJSON(REST_KEY, rest), [rest]);
@@ -1337,7 +1376,10 @@ function FitnessTracker() {
     const cleanExercises = activeWorkout.exercises
       .map((ex) => ({
         ...ex,
-        sets: ex.sets.filter((s) => (isCardio ? s.completed && s.rpe !== "" : s.completed && s.weight !== "" && s.reps !== "")),
+        sets: ex.sets
+          .filter((s) => (isCardio ? s.completed && s.rpe !== "" : s.completed && s.weight !== "" && s.reps !== ""))
+          // Keep which unit the set was typed in; drop the raw text.
+          .map(({ entry, entryUnit, ...s }) => (entryUnit ? { ...s, unit: entryUnit } : s)),
       }))
       .filter((ex) => ex.sets.length > 0);
 
@@ -1380,14 +1422,16 @@ function FitnessTracker() {
         {screen === "dashboard" && (
           <Dashboard
             history={history}
+            unit={unit}
+            setUnit={setUnit}
             onStartDay={startDay}
             onImport={importHistory}
             onReset={clearAllData}
           />
         )}
-        {screen === "workout" && <WorkoutScreen activeWorkout={activeWorkout} history={history.filter((h) => !activeWorkout || h.id !== activeWorkout.id)} setActiveWorkout={setActiveWorkout} onFinish={finishWorkout} onDiscard={discardWorkout} onStartDay={startDay} onStartRest={startRest} />}
+        {screen === "workout" && <WorkoutScreen activeWorkout={activeWorkout} history={history.filter((h) => !activeWorkout || h.id !== activeWorkout.id)} unit={unit} setUnit={setUnit} setActiveWorkout={setActiveWorkout} onFinish={finishWorkout} onDiscard={discardWorkout} onStartDay={startDay} onStartRest={startRest} />}
         {screen === "history" && <HistoryScreen history={history} />}
-        {screen === "progress" && <ProgressScreen history={history} />}
+        {screen === "progress" && <ProgressScreen history={history} unit={unit} />}
       </div>
       {/* One sticky cluster: the page itself scrolls, so an unsticky rest bar
           would scroll off the bottom of a long workout. */}

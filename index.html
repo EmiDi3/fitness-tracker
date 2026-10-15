@@ -37,6 +37,7 @@ const HISTORY_KEY = "fitness-tracker:history:v1";
 const ACTIVE_KEY = "fitness-tracker:active:v1";
 const REST_KEY = "fitness-tracker:rest:v1";
 const UNIT_KEY = "fitness-tracker:unit:v1";
+const BACKUP_KEY = "fitness-tracker:last-backup:v1";
 
 function loadJSON(key, fallback) {
   try {
@@ -434,9 +435,28 @@ function downloadBlob(content, filename, type) {
 function todayStamp() {
   return new Date().toISOString().slice(0, 10);
 }
-function exportHistoryJSON(history) {
+// On the iPhone this opens the share sheet, so the backup can go straight to
+// Files → OneDrive → Health/workout-data, where Claude reads it. Elsewhere it
+// falls back to a plain download. Resolves true only if the file went somewhere.
+async function exportHistoryJSON(history) {
   const payload = { exportedAt: new Date().toISOString(), app: "My Fitness Journey", history };
-  downloadBlob(JSON.stringify(payload, null, 2), `fitness-data-${todayStamp()}.json`, "application/json");
+  const content = JSON.stringify(payload, null, 2);
+  const filename = `fitness-data-${todayStamp()}.json`;
+  try {
+    const file = new File([content], filename, { type: "application/json" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file] });
+      return true;
+    }
+  } catch (e) {
+    // Closing the share sheet rejects with AbortError — that is not a backup.
+    if (e && e.name === "AbortError") return false;
+  }
+  downloadBlob(content, filename, "application/json");
+  return true;
+}
+function daysSince(iso) {
+  return iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : null;
 }
 function csvEscape(value) {
   const str = String(value ?? "");
@@ -560,6 +580,17 @@ function Pill({ children, color = C.roseLighter, textColor = C.roseDark }) {
 function DataCard({ history, onImport, onReset }) {
   const fileInputRef = useRef(null);
   const [importError, setImportError] = useState("");
+  const [lastBackup, setLastBackup] = useState(() => loadJSON(BACKUP_KEY, null));
+  const age = daysSince(lastBackup);
+  const overdue = history.length > 0 && (age === null || age >= 7);
+
+  const handleBackup = async () => {
+    if (await exportHistoryJSON(history)) {
+      const now = new Date().toISOString();
+      saveJSON(BACKUP_KEY, now);
+      setLastBackup(now);
+    }
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -583,14 +614,18 @@ function DataCard({ history, onImport, onReset }) {
   return (
     <div className="rounded-2xl p-4" style={{ background: C.card, border: `1px solid ${C.line}` }}>
       <h2 className="text-sm font-semibold mb-1" style={{ color: C.plum }}>Your data</h2>
-      <p className="text-xs mb-3" style={{ color: C.taupe }}>
-        Export a copy to move to another device, or back it up. Import brings a previous export back in.
+      <p className="text-xs mb-2" style={{ color: C.taupe }}>
+        Workouts live only on this phone. Back up to Files → OneDrive → Health → workout-data. Import brings a backup back in.
       </p>
+      <div className="text-xs mb-3 font-medium" style={{ color: overdue ? C.roseDark : C.sageDark }}>
+        {age === null ? "Not backed up yet" : age === 0 ? "Last backup: today" : `Last backup: ${age} day${age === 1 ? "" : "s"} ago`}
+        {overdue && " — time for a backup"}
+      </div>
       <div className="grid grid-cols-2 gap-2">
-        <button onClick={() => exportHistoryJSON(history)}
+        <button onClick={handleBackup}
           className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-medium"
-          style={{ background: C.roseLighter, color: C.roseDark }}>
-          <IconDownload size={14} /> Export JSON
+          style={{ background: overdue ? C.rose : C.roseLighter, color: overdue ? "#fff" : C.roseDark }}>
+          <IconDownload size={14} /> Back up (JSON)
         </button>
         <button onClick={() => exportHistoryCSV(history)}
           className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-medium"

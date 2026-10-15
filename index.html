@@ -404,6 +404,13 @@ function unitToKg(value, unit) {
 function fmtWeight(kg, unit) {
   return String(Math.round(kgToUnit(Number(kg) || 0, unit) * 10) / 10);
 }
+// A past set in her current unit. Sets typed in lb convert back exactly. Boston
+// sets from before the switch were converted to kg by hand and rounded, so
+// their lb value is only approximate — shown as "≈", to the nearest pound.
+function fmtPrevWeight(set, unit) {
+  if (unit === "lb" && set.unit !== "lb") return `≈${Math.round(kgToUnit(Number(set.weight) || 0, "lb"))}`;
+  return fmtWeight(set.weight, unit);
+}
 
 function UnitToggle({ unit, setUnit }) {
   return (
@@ -915,12 +922,13 @@ function ExerciseCard({ exercise, exIndex, history, unit, onSetChange, onWeightC
             <div key={si} className="grid grid-cols-[28px_1fr_1fr_1fr_32px] gap-2 items-center rounded-xl px-1 py-1.5"
               style={{ background: set.completed ? C.sageLight : "transparent" }}>
               <div className="text-sm font-medium text-center" style={{ color: set.completed ? C.sageDark : C.plum }}>{si + 1}</div>
-              <div className="text-xs" style={{ color: C.taupe }}>{prev ? `${fmtWeight(prev.weight, unit)}${unit} x${prev.reps}` : "—"}</div>
+              <div className="text-xs" style={{ color: C.taupe }}>{prev ? `${fmtPrevWeight(prev, unit)}${unit} x${prev.reps}` : "—"}</div>
+              {/* Last time's numbers sit in the empty fields as the target to beat. */}
               <input type="number" inputMode="decimal" value={shown}
-                onChange={(e) => onWeightChange(exIndex, si, e.target.value)} placeholder="0"
+                onChange={(e) => onWeightChange(exIndex, si, e.target.value)} placeholder={prev ? fmtPrevWeight(prev, unit).replace("≈", "") : "0"}
                 className="w-full rounded-lg px-2 py-1.5 text-sm text-center outline-none" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.plum }} />
               <input type="number" inputMode="numeric" value={set.reps === "" ? "" : set.reps}
-                onChange={(e) => onSetChange(exIndex, si, "reps", e.target.value)} placeholder="0"
+                onChange={(e) => onSetChange(exIndex, si, "reps", e.target.value)} placeholder={prev ? String(prev.reps) : "0"}
                 className="w-full rounded-lg px-2 py-1.5 text-sm text-center outline-none" style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.plum }} />
               <button
                 onClick={() => {
